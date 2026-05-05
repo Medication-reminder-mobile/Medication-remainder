@@ -1,17 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'screens/login_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/role_selection_screen.dart';
-import 'screens/splash_screen.dart';
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MedReminderApp());
 }
 
-/// Root widget: Material 3 theme + named routes for team integration.
 class MedReminderApp extends StatelessWidget {
   const MedReminderApp({super.key});
 
@@ -52,18 +45,24 @@ class MedReminderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Vitalis Medication Manager',
+      title: 'Medication Reminder',
       themeMode: ThemeMode.system,
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
-      initialRoute: '/',
-      routes: {
-        '/': (_) => const SplashScreen(),
-        '/login': (_) => const LoginScreen(),
-        '/register': (_) => const RegisterScreen(),
-        '/role-selection': (_) => const RoleSelectionScreen(),
-        '/profile': (_) => const ProfileScreen(),
-      },
+      home: const _AppShellScreen(),
+    );
+  }
+}
+
+class _AppShellScreen extends StatelessWidget {
+  const _AppShellScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }
