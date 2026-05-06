@@ -141,3 +141,10 @@ Home (role-based)
 |--------|------|
 | Member 1 | Foundation & Backend Core — database, auth, notifications, background tasks |
 | Member 2 | Onboarding, Auth Screens & Patient Home — splash, onboarding, login/register, role selection, patient dashboard |
+
+## 📋 System Design (Member 3)
+
+- [System Design Overview](./docs/system-design/SYSTEM_DESIGN.md)
+- [Architecture Diagram](./docs/system-design/ARCHITECTURE.md)
+- [Database Design (ERD)](./docs/system-design/DATABASE_DESIGN.md)
+- [Data Flow](./docs/system-design/DATA_FLOW.md)
