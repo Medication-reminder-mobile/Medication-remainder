@@ -18,6 +18,9 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   bool _loading = true;
   Map<String, int> _stats = const {'perfect': 0, 'partial': 0, 'missed': 0};
+  int _currentStreak = 0;
+  List<double> _weeklyPulse = const [85, 90, 78, 95, 88, 70, 92];
+  Map<int, String> _monthDayStatus = const {};
 
   @override
   void didChangeDependencies() {
@@ -36,8 +39,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
         now.year,
         now.month,
       );
+      final streak = await DbService.instance.getCurrentStreak(userId);
+      final logs = await DbService.instance.getLogsByUser(userId);
+      final weekly = _buildWeeklyPulse(logs, now);
+      final monthStatus = _buildMonthDayStatus(logs, now);
       if (!mounted) return;
-      setState(() => _stats = s);
+      setState(() {
+        _stats = s;
+        _currentStreak = streak;
+        _weeklyPulse = weekly;
+        _monthDayStatus = monthStatus;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -57,6 +69,48 @@ class _ReportsScreenState extends State<ReportsScreen> {
         'Your adherence report. Overall adherence is $pct percent. '
         'You had $perfect perfect days and $missed missed days this month. Keep it up!';
     await VoiceService.instance.speak(summary);
+  }
+
+  List<double> _buildWeeklyPulse(List<dynamic> logs, DateTime now) {
+    final start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final byDate = <String, List<dynamic>>{};
+    for (final log in logs) {
+      final date = DateTime.tryParse(log.date);
+      if (date == null || date.isBefore(start)) continue;
+      byDate.putIfAbsent(log.date as String, () => []).add(log);
+    }
+
+    return List<double>.generate(7, (i) {
+      final day = start.add(Duration(days: i));
+      final key = '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      final entries = byDate[key] ?? const [];
+      if (entries.isEmpty) return 0;
+      final taken = entries.where((e) => e.status == 'taken').length;
+      return (taken / entries.length) * 100;
+    });
+  }
+
+  Map<int, String> _buildMonthDayStatus(List<dynamic> logs, DateTime now) {
+    final byDate = <String, List<dynamic>>{};
+    for (final log in logs) {
+      final date = DateTime.tryParse(log.date);
+      if (date == null || date.year != now.year || date.month != now.month) continue;
+      byDate.putIfAbsent(log.date as String, () => []).add(log);
+    }
+    final result = <int, String>{};
+    byDate.forEach((date, entries) {
+      final parsed = DateTime.tryParse(date);
+      if (parsed == null) return;
+      final taken = entries.where((e) => e.status == 'taken').length;
+      if (taken == entries.length) {
+        result[parsed.day] = 'perfect';
+      } else if (taken > 0) {
+        result[parsed.day] = 'partial';
+      } else {
+        result[parsed.day] = 'missed';
+      }
+    });
+    return result;
   }
 
   @override
@@ -144,13 +198,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   // Stats row
                   Row(
                     children: [
-                      Expanded(
-                        child: _StatCard(
-                          label: 'CURRENT STREAK',
-                          value: '12',
-                          sub: 'days',
-                        ),
-                      ),
+                      Expanded(child: _StatCard(label: 'CURRENT STREAK', value: '$_currentStreak', sub: 'days')),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _StatCard(
@@ -293,15 +341,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       alpha: 0.08,
                                     ),
                                   ),
-                                  spots: const [
-                                    FlSpot(0, 85),
-                                    FlSpot(1, 90),
-                                    FlSpot(2, 78),
-                                    FlSpot(3, 95),
-                                    FlSpot(4, 88),
-                                    FlSpot(5, 70),
-                                    FlSpot(6, 92),
-                                  ],
+                                  spots: List.generate(_weeklyPulse.length, (i) => FlSpot(i.toDouble(), _weeklyPulse[i])),
                                 ),
                                 LineChartBarData(
                                   isCurved: false,
@@ -381,6 +421,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               color: AppColors.missedAlert,
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 16),
+                        _CalendarHeatmap(
+                          month: now,
+                          dayStatus: _monthDayStatus,
                         ),
                         const SizedBox(height: 16),
                         Container(
@@ -527,6 +572,79 @@ class _StatRow extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarHeatmap extends StatelessWidget {
+  const _CalendarHeatmap({required this.month, required this.dayStatus});
+
+  final DateTime month;
+  final Map<int, String> dayStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final firstWeekday = DateTime(month.year, month.month, 1).weekday;
+    final leading = firstWeekday - 1; // Mon-based grid
+    final totalCells = leading + daysInMonth;
+    final trailing = (7 - (totalCells % 7)) % 7;
+
+    Color dayColor(int? day) {
+      if (day == null) return Colors.transparent;
+      final status = dayStatus[day];
+      if (status == 'perfect') return AppColors.primary.withValues(alpha: 0.95);
+      if (status == 'partial') return AppColors.warningRefill.withValues(alpha: 0.9);
+      if (status == 'missed') return AppColors.missedAlert.withValues(alpha: 0.9);
+      return Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4);
+    }
+
+    final cells = <int?>[
+      ...List<int?>.filled(leading, null),
+      ...List<int?>.generate(daysInMonth, (i) => i + 1),
+      ...List<int?>.filled(trailing, null),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Monthly Calendar Heatmap',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: cells.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            childAspectRatio: 1,
+          ),
+          itemBuilder: (context, i) {
+            final day = cells[i];
+            return Container(
+              decoration: BoxDecoration(
+                color: dayColor(day),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: day == null
+                  ? null
+                  : Text(
+                      '$day',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: dayStatus[day] == null ? AppColors.textSecondary : Colors.white,
+                      ),
+                    ),
+            );
+          },
         ),
       ],
     );

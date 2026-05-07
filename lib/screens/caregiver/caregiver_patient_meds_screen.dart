@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/medication_model.dart';
 import '../../providers/medication_provider.dart';
+import '../../services/db_service.dart';
 import '../../widgets/pill_icon_widget.dart';
 
 class CaregiverPatientMedsScreen extends StatelessWidget {
@@ -17,7 +18,7 @@ class CaregiverPatientMedsScreen extends StatelessWidget {
     final meds = provider.medications.where((m) => m.userId == patientId).toList(growable: false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Patient Meds')),
+      appBar: AppBar(title: const Text('Patient Medications')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: meds.isEmpty
@@ -25,7 +26,17 @@ class CaregiverPatientMedsScreen extends StatelessWidget {
             : ListView.separated(
                 itemCount: meds.length,
                 separatorBuilder: (context, index) => const SizedBox(height: 10),
-                itemBuilder: (context, i) => _Tile(med: meds[i]),
+                itemBuilder: (context, i) => _Tile(
+                  med: meds[i],
+                  onToggleStatus: () async {
+                    final current = meds[i].status;
+                    final next = current == 'paused' ? 'active' : 'paused';
+                    if (meds[i].id == null) return;
+                    await DbService.instance.updateMedicationStatus(meds[i].id!, next);
+                    if (!context.mounted) return;
+                    await context.read<MedicationProvider>().loadMedications(patientId);
+                  },
+                ),
               ),
       ),
     );
@@ -33,8 +44,9 @@ class CaregiverPatientMedsScreen extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.med});
+  const _Tile({required this.med, required this.onToggleStatus});
   final MedicationModel med;
+  final VoidCallback onToggleStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +85,20 @@ class _Tile extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
-          )
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Caregiver actions',
+            onSelected: (value) async {
+              if (value == 'toggle') onToggleStatus();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'toggle',
+                child: Text(med.status == 'paused' ? 'Resume medication' : 'Pause medication'),
+              ),
+            ],
+            icon: const Icon(Icons.more_vert),
+          ),
         ],
       ),
     );
