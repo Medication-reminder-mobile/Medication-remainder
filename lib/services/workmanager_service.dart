@@ -4,6 +4,7 @@ import 'package:workmanager/workmanager.dart';
 import '../core/utils/date_helpers.dart';
 import 'db_service.dart';
 import 'notification_service.dart';
+import 'voice_service.dart';
 
 class WorkManagerService {
   WorkManagerService._();
@@ -43,14 +44,22 @@ void callbackDispatcher() {
       final db = DbService.instance;
       final notif = NotificationService.instance;
       await notif.initialize();
+      await VoiceService.instance.initialize();
 
       final database = await db.database;
       final rows = await database.rawQuery(
         '''
-SELECT il.id as logId, il.scheduledTime as scheduledTime, il.date as date, m.name as medName, m.dosageStrength as strength, m.dosageUnit as unit
+SELECT il.id as logId,
+       il.scheduledTime as scheduledTime,
+       il.date as date,
+       m.name as medName,
+       m.dosageStrength as strength,
+       m.dosageUnit as unit,
+       m.status as medStatus,
+       m.tags as tags
 FROM intake_logs il
 JOIN medications m ON m.id = il.medicationId
-WHERE il.status = 'upcoming' AND il.date = ?
+WHERE il.status = 'upcoming' AND il.date = ? AND m.status = 'active'
 ''',
         [today],
       );
@@ -64,10 +73,19 @@ WHERE il.status = 'upcoming' AND il.date = ?
           final dose =
               '${(r['strength'] as String?) ?? ''}${(r['unit'] as String?) ?? ''}'
                   .trim();
+          final tags = (r['tags'] as String?) ?? '[]';
+          final voiceEnabled = tags.contains('voice_enabled');
+
           await notif.showInstantNotification(
             'Upcoming dose',
             'In $diff min: $med ${dose.isEmpty ? '' : '($dose)'}',
           );
+
+          if (voiceEnabled && diff <= 1) {
+            await VoiceService.instance.speakForced(
+              'Time to take your $med ${dose.isEmpty ? '' : dose}',
+            );
+          }
         }
       }
     }

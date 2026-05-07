@@ -25,6 +25,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
   String _shape = 'capsule';
   String _color = '#00897B';
   String _frequency = 'daily';
+  bool _voiceReminder = false;
   bool _init = false;
 
   @override
@@ -44,6 +45,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
     _shape = med.pillShape;
     _color = med.pillColor;
     _frequency = med.frequency;
+    _voiceReminder = med.tags.contains('voice_enabled');
     _init = true;
   }
 
@@ -63,6 +65,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
       pillShape: _shape,
       pillColor: _color,
       scheduledTimes: times.isEmpty ? old.scheduledTimes : times,
+      tags: _voiceReminder ? const ['voice_enabled'] : const ['text_only'],
     );
 
     await context.read<MedicationProvider>().updateMedication(updated);
@@ -107,7 +110,8 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                 label: 'Medication name',
                 prefixIcon: Icons.medication_outlined,
                 controller: _name,
-                validator: (v) => Validators.requiredField(v, label: 'Medication name'),
+                validator: (v) =>
+                    Validators.requiredField(v, label: 'Medication name'),
               ),
               const SizedBox(height: 12),
               Row(
@@ -117,7 +121,8 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                       label: 'Strength',
                       prefixIcon: Icons.numbers_outlined,
                       controller: _strength,
-                      validator: (v) => Validators.requiredField(v, label: 'Strength'),
+                      validator: (v) =>
+                          Validators.requiredField(v, label: 'Strength'),
                       keyboardType: TextInputType.number,
                     ),
                   ),
@@ -127,7 +132,8 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                       label: 'Unit',
                       prefixIcon: Icons.straighten_outlined,
                       controller: _unit,
-                      validator: (v) => Validators.requiredField(v, label: 'Unit'),
+                      validator: (v) =>
+                          Validators.requiredField(v, label: 'Unit'),
                     ),
                   ),
                 ],
@@ -137,7 +143,8 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                 label: 'Scheduled times (HH:mm, comma separated)',
                 prefixIcon: Icons.schedule_outlined,
                 controller: _times,
-                validator: (v) => Validators.requiredField(v, label: 'Scheduled times'),
+                validator: (v) =>
+                    Validators.requiredField(v, label: 'Scheduled times'),
               ),
               const SizedBox(height: 12),
               Row(
@@ -148,21 +155,36 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                       decoration: const InputDecoration(labelText: 'Frequency'),
                       items: const [
                         DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                        DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                        DropdownMenuItem(value: 'custom', child: Text('Custom')),
+                        DropdownMenuItem(
+                          value: 'weekly',
+                          child: Text('Weekly'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'custom',
+                          child: Text('Custom'),
+                        ),
                       ],
-                      onChanged: (v) => setState(() => _frequency = v ?? 'daily'),
+                      onChanged: (v) =>
+                          setState(() => _frequency = v ?? 'daily'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: _shape,
-                      decoration: const InputDecoration(labelText: 'Pill shape'),
+                      decoration: const InputDecoration(
+                        labelText: 'Pill shape',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'capsule', child: Text('Capsule')),
+                        DropdownMenuItem(
+                          value: 'capsule',
+                          child: Text('Capsule'),
+                        ),
                         DropdownMenuItem(value: 'round', child: Text('Round')),
-                        DropdownMenuItem(value: 'square', child: Text('Square')),
+                        DropdownMenuItem(
+                          value: 'square',
+                          child: Text('Square'),
+                        ),
                       ],
                       onChanged: (v) => setState(() => _shape = v ?? 'capsule'),
                     ),
@@ -170,6 +192,13 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                 ],
               ),
               const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Voice reminder'),
+                subtitle: const Text('Speak medication name when enabled'),
+                value: _voiceReminder,
+                onChanged: (v) => setState(() => _voiceReminder = v),
+              ),
+              const SizedBox(height: 8),
               AppButton(
                 text: 'Save Changes',
                 isLoading: provider.isLoading,
@@ -182,4 +211,3 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
     );
   }
 }
-

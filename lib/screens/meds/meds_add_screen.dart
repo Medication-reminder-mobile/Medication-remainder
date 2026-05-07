@@ -77,7 +77,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       status: 'active',
       refillCount: int.tryParse(_refillCount.text.trim()) ?? 30,
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-      tags: const [],
+      tags: _voiceReminder ? const ['voice_enabled'] : const ['text_only'],
       createdAt: DateTime.now(),
     );
 
