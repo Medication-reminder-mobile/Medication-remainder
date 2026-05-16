@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
+ 
 import 'core/constants/app_routes.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth_screen.dart';
@@ -22,7 +22,7 @@ import 'screens/tabs/meds_screen.dart';
 import 'screens/tabs/profile_screen.dart';
 import 'screens/tabs/reports_screen.dart';
 import 'screens/voice/voice_screen.dart';
-
+ 
 GoRouter createRouter(AuthProvider auth) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
@@ -47,6 +47,7 @@ GoRouter createRouter(AuthProvider auth) {
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
+          // ── Main tabs ──────────────────────────────────────────────────
           GoRoute(
             path: AppRoutes.home,
             builder: (context, state) {
@@ -77,69 +78,75 @@ GoRouter createRouter(AuthProvider auth) {
             path: AppRoutes.rbc,
             builder: (context, state) => const RbcDashboardScreen(),
           ),
+          GoRoute(
+            path: AppRoutes.voice,
+            builder: (context, state) => const VoiceScreen(),
+          ),
+ 
+          // ── Medication screens (kept inside ShellRoute so AppShell /
+          //    bottom nav / back navigation all work correctly) ──────────
+          GoRoute(
+            path: AppRoutes.medsAdd,
+            builder: (context, state) => const MedsAddScreen(),
+          ),
+          GoRoute(
+            path: '${AppRoutes.medsDetail}/:id',
+            builder: (context, state) => MedsDetailScreen(
+              id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '${AppRoutes.medsEdit}/:id',
+            builder: (context, state) => MedsEditScreen(
+              id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+            ),
+          ),
+ 
+          // ── Caregiver screens (also inside ShellRoute) ────────────────
+          GoRoute(
+            path: AppRoutes.caregiverPatients,
+            builder: (context, state) => const CaregiverPatientsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.caregiverLink,
+            builder: (context, state) => const CaregiverLinkScreen(),
+          ),
+          GoRoute(
+            path: '${AppRoutes.caregiverPatientMeds}/:patientId',
+            builder: (context, state) => CaregiverPatientMedsScreen(
+              patientId:
+                  int.tryParse(state.pathParameters['patientId'] ?? '') ?? 0,
+            ),
+          ),
         ],
-      ),
-      GoRoute(
-        path: AppRoutes.medsAdd,
-        builder: (context, state) => const MedsAddScreen(),
-      ),
-      GoRoute(
-        path: '${AppRoutes.medsDetail}/:id',
-        builder: (context, state) => MedsDetailScreen(
-          id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '${AppRoutes.medsEdit}/:id',
-        builder: (context, state) => MedsEditScreen(
-          id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: AppRoutes.caregiverPatients,
-        builder: (context, state) => const CaregiverPatientsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.caregiverLink,
-        builder: (context, state) => const CaregiverLinkScreen(),
-      ),
-      GoRoute(
-        path: '${AppRoutes.caregiverPatientMeds}/:patientId',
-        builder: (context, state) => CaregiverPatientMedsScreen(
-          patientId: int.tryParse(state.pathParameters['patientId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: AppRoutes.voice,
-        builder: (context, state) => const VoiceScreen(),
       ),
     ],
     redirect: (context, state) {
       final loggedIn = auth.currentUser != null;
       final role = auth.currentUser?.role ?? '';
       final loc = state.uri.toString();
-
+ 
       // Never redirect away from splash — it handles itself
       if (loc.startsWith(AppRoutes.splash)) return null;
-
+ 
       // Auth flow pages are always accessible when not logged in
       final isAuthFlow =
           loc.startsWith(AppRoutes.onboarding) ||
           loc.startsWith(AppRoutes.auth) ||
           loc.startsWith(AppRoutes.roleSelect);
-
+ 
       if (!loggedIn && !isAuthFlow) return AppRoutes.auth;
-
+ 
       // Logged in but no role yet → role selection
       if (loggedIn && role.isEmpty && !loc.startsWith(AppRoutes.roleSelect)) {
         return AppRoutes.roleSelect;
       }
-
+ 
       // Logged in with role → redirect away from auth/onboarding/role-select
       if (loggedIn && role.isNotEmpty && isAuthFlow) {
         return AppRoutes.home;
       }
-
+ 
       return null;
     },
     errorBuilder: (context, state) =>

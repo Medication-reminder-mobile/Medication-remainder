@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/utils/validators.dart';
@@ -72,10 +73,14 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
     if (!mounted) return;
     final err = context.read<MedicationProvider>().errorMessage;
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err)),
+      );
       return;
     }
-    Navigator.of(context).pop();
+    // FIX: use context.pop() (GoRouter) instead of Navigator.of(context).pop()
+    // Mixing Navigator and GoRouter corrupts the route stack.
+    context.pop();
   }
 
   @override
@@ -91,7 +96,14 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
 
     if (med == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Edit Medication')),
+        appBar: AppBar(
+          // FIX: back button present even on "not found" state
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Edit Medication'),
+        ),
         body: const Center(child: Text('Medication not found.')),
       );
     }
@@ -99,7 +111,15 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
     if (!_init) _populate(item);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Medication')),
+      appBar: AppBar(
+        // FIX: explicit back/close button so the user can cancel without saving
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => context.pop(),
+          tooltip: 'Cancel',
+        ),
+        title: const Text('Edit Medication'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -151,10 +171,13 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _frequency,
+                      initialValue: _frequency,
                       decoration: const InputDecoration(labelText: 'Frequency'),
                       items: const [
-                        DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                        DropdownMenuItem(
+                          value: 'daily',
+                          child: Text('Daily'),
+                        ),
                         DropdownMenuItem(
                           value: 'weekly',
                           child: Text('Weekly'),
@@ -171,7 +194,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _shape,
+                      initialValue: _shape,
                       decoration: const InputDecoration(
                         labelText: 'Pill shape',
                       ),
@@ -180,13 +203,17 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                           value: 'capsule',
                           child: Text('Capsule'),
                         ),
-                        DropdownMenuItem(value: 'round', child: Text('Round')),
+                        DropdownMenuItem(
+                          value: 'round',
+                          child: Text('Round'),
+                        ),
                         DropdownMenuItem(
                           value: 'square',
                           child: Text('Square'),
                         ),
                       ],
-                      onChanged: (v) => setState(() => _shape = v ?? 'capsule'),
+                      onChanged: (v) =>
+                          setState(() => _shape = v ?? 'capsule'),
                     ),
                   ),
                 ],

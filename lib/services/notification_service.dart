@@ -54,9 +54,8 @@ class NotificationService {
         'Time to take your $medicationName, $dosage',
         tzTime,
         details,
+        // FIX: removed uiLocalNotificationDateInterpretation — deleted in v19+
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
       );
     }
 
@@ -113,9 +112,8 @@ class NotificationService {
             : 'Time to take your $medicationName, $dosage',
         next,
         details,
+        // FIX: removed uiLocalNotificationDateInterpretation — deleted in v19+
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
       );
     }

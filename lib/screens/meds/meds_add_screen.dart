@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
+ 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../models/medication_model.dart';
@@ -9,17 +9,17 @@ import '../../providers/auth_provider.dart';
 import '../../providers/medication_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield.dart';
-
+ 
 class MedsAddScreen extends StatefulWidget {
   const MedsAddScreen({super.key});
-
+ 
   @override
   State<MedsAddScreen> createState() => _MedsAddScreenState();
 }
-
+ 
 class _MedsAddScreenState extends State<MedsAddScreen> {
   int _step = 0; // 0=Info, 1=Schedule, 2=Alerts
-
+ 
   // Step 1 — Info
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
@@ -27,16 +27,16 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
   final _unit = TextEditingController(text: 'mg');
   String _shape = 'capsule';
   String _color = '#00897B';
-
+ 
   // Step 2 — Schedule
   String _frequency = 'daily';
   final List<TimeOfDay> _times = [const TimeOfDay(hour: 8, minute: 0)];
   bool _voiceReminder = false;
-
+ 
   // Step 3 — Alerts
   final _refillCount = TextEditingController(text: '30');
   final _notes = TextEditingController();
-
+ 
   @override
   void dispose() {
     _name.dispose();
@@ -46,10 +46,10 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
     _notes.dispose();
     super.dispose();
   }
-
+ 
   String _fmtTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
+ 
   Future<void> _pickTime(int index) async {
     final picked = await showTimePicker(
       context: context,
@@ -59,11 +59,11 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       setState(() => _times[index] = picked);
     }
   }
-
+ 
   Future<void> _save() async {
     final userId = context.read<AuthProvider>().currentUser?.id;
     if (userId == null) return;
-
+ 
     final med = MedicationModel(
       id: null,
       userId: userId,
@@ -80,7 +80,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       tags: _voiceReminder ? const ['voice_enabled'] : const ['text_only'],
       createdAt: DateTime.now(),
     );
-
+ 
     await context.read<MedicationProvider>().addMedication(med);
     if (!mounted) return;
     final err = context.read<MedicationProvider>().errorMessage;
@@ -88,18 +88,21 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       return;
     }
-    context.go('/meds');
+    // FIX: use context.pop() so GoRouter returns to the previous route
+    // (the meds tab) without replacing the entire navigation stack.
+    context.pop();
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MedicationProvider>();
-
+ 
     return Scaffold(
       appBar: AppBar(
+        // FIX: explicit close button navigates back correctly inside ShellRoute
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.go('/meds'),
+          onPressed: () => context.pop(),
           tooltip: 'Close',
         ),
         title: const Text('Add Medication'),
@@ -247,7 +250,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       ),
     );
   }
-
+ 
   Widget _buildStep1() {
     return Form(
       key: _formKey,
@@ -366,7 +369,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       ),
     );
   }
-
+ 
   Widget _buildStep2() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,7 +524,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       ],
     );
   }
-
+ 
   Widget _buildStep3(MedicationProvider provider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,7 +580,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       ],
     );
   }
-
+ 
   Widget _label(String text) => Text(
     text,
     style: const TextStyle(
@@ -587,7 +590,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
       letterSpacing: 0.8,
     ),
   );
-
+ 
   Widget _summaryRow(String label, String value) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
     child: Row(
@@ -604,7 +607,7 @@ class _MedsAddScreenState extends State<MedsAddScreen> {
     ),
   );
 }
-
+ 
 class _ShapeOption extends StatelessWidget {
   const _ShapeOption({
     required this.icon,
@@ -618,7 +621,7 @@ class _ShapeOption extends StatelessWidget {
   final String value;
   final bool selected;
   final VoidCallback onTap;
-
+ 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -661,7 +664,7 @@ class _ShapeOption extends StatelessWidget {
     );
   }
 }
-
+ 
 class _FreqOption extends StatelessWidget {
   const _FreqOption({
     required this.label,
@@ -675,7 +678,7 @@ class _FreqOption extends StatelessWidget {
   final String value;
   final bool selected;
   final VoidCallback onTap;
-
+ 
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -710,7 +713,7 @@ class _FreqOption extends StatelessWidget {
     );
   }
 }
-
+ 
 class _ColorDot extends StatelessWidget {
   const _ColorDot({
     required this.hex,
@@ -720,7 +723,7 @@ class _ColorDot extends StatelessWidget {
   final String hex;
   final bool selected;
   final VoidCallback onTap;
-
+ 
   @override
   Widget build(BuildContext context) {
     final c = Color(int.parse('FF${hex.substring(1)}', radix: 16));
