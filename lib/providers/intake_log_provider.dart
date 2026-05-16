@@ -69,6 +69,27 @@ class IntakeLogProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> markUpcoming(IntakeLogModel log, {int? userId}) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final updated = log.copyWith(status: 'upcoming');
+      await _db.updateIntakeLog(updated);
+      final index = todayLogs.indexWhere((l) => l.id == log.id);
+      if (index != -1) {
+        todayLogs[index] = updated;
+        notifyListeners();
+      }
+      if (userId != null) await loadAdherenceStats(userId);
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logAll(int userId) async {
     isLoading = true;
     errorMessage = null;

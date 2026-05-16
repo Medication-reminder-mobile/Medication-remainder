@@ -36,16 +36,65 @@ class _LogScreenState extends State<LogScreen> {
 
   Future<void> _logAllTaken() async {
     final provider = context.read<IntakeLogProvider>();
-    final upcoming = provider.todayLogs
-        .where((l) => l.status == 'upcoming')
-        .toList();
+    final upcoming = provider.todayLogs.where((l) => l.status == 'upcoming').toList();
+    if (upcoming.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No upcoming medications to mark')),
+      );
+      return;
+    }
     for (final log in upcoming) {
       await provider.markTaken(log);
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('All medications marked as taken')),
+      SnackBar(content: Text('${upcoming.length} medication${upcoming.length == 1 ? '' : 's'} marked as taken')),
     );
+  }
+
+  /// Shows a bottom sheet to let the user choose taken / missed / reset.
+  Future<void> _showActionSheet(BuildContext context, dynamic log) async {
+    final provider = context.read<IntakeLogProvider>();
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.check_circle_outline, color: AppColors.primary),
+              title: const Text('Mark as taken'),
+              onTap: () => Navigator.pop(context, 'taken'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cancel_outlined, color: AppColors.missedAlert),
+              title: const Text('Mark as missed'),
+              onTap: () => Navigator.pop(context, 'missed'),
+            ),
+            if (log.status == 'taken' || log.status == 'missed')
+              ListTile(
+                leading: const Icon(Icons.undo, color: AppColors.inactiveUpcoming),
+                title: const Text('Reset to upcoming'),
+                onTap: () => Navigator.pop(context, 'reset'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'taken') {
+      await provider.markTaken(log);
+    } else if (action == 'missed') {
+      await provider.markMissed(log);
+    } else if (action == 'reset') {
+      await provider.markUpcoming(log); // ensure this method exists in your provider
+    }
   }
 
   @override
@@ -53,42 +102,19 @@ class _LogScreenState extends State<LogScreen> {
     final provider = context.watch<IntakeLogProvider>();
     final medsProvider = context.watch<MedicationProvider>();
     final logs = provider.todayLogs;
-    final done = logs.where((l) => l.status == 'taken').length;
+    final taken = logs.where((l) => l.status == 'taken').length;
+    final missed = logs.where((l) => l.status == 'missed').length;
     final total = logs.length;
     final now = DateTime.now();
-    final dayName = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ][now.weekday - 1];
-    final monthName = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ][now.month - 1];
+    final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][now.weekday - 1];
+    final monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.month - 1];
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         title: const Text('MedRemind'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.mic_none_outlined),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.mic_none_outlined), onPressed: () {}),
         ],
       ),
       body: RefreshIndicator(
@@ -103,16 +129,12 @@ class _LogScreenState extends State<LogScreen> {
                     baseColor: Theme.of(context).brightness == Brightness.dark
                         ? const Color(0xFF232323)
                         : const Color(0xFFE5E7EB),
-                    highlightColor:
-                        Theme.of(context).brightness == Brightness.dark
+                    highlightColor: Theme.of(context).brightness == Brightness.dark
                         ? const Color(0xFF2D2D2D)
                         : const Color(0xFFF3F4F6),
                     child: Container(
                       height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
                 ),
@@ -123,11 +145,7 @@ class _LogScreenState extends State<LogScreen> {
                   // Header
                   Text(
                     '$dayName, $monthName ${now.day}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -136,51 +154,51 @@ class _LogScreenState extends State<LogScreen> {
                       const Expanded(
                         child: Text(
                           'Daily Intake\nLog',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            height: 1.1,
-                          ),
+                          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1.1),
                         ),
                       ),
+                      // Summary chip with taken/missed/total
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: Theme.of(context).cardTheme.color,
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: const [
-                            BoxShadow(
-                              blurRadius: 6,
-                              offset: Offset(0, 2),
-                              color: Colors.black12,
-                            ),
-                          ],
+                          boxShadow: const [BoxShadow(blurRadius: 6, offset: Offset(0, 2), color: Colors.black12)],
                         ),
                         child: Column(
                           children: [
                             Text(
-                              '$done/$total',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              '$taken/$total',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                             ),
-                            const Text(
-                              'Done',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
+                            const Text('Done', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                            if (missed > 0)
+                              Text(
+                                '$missed missed',
+                                style: const TextStyle(color: AppColors.missedAlert, fontSize: 11, fontWeight: FontWeight.w700),
                               ),
-                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
+
+                  // Progress bar
+                  if (total > 0) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: taken / total,
+                        minHeight: 8,
+                        backgroundColor: AppColors.inactiveUpcoming.withValues(alpha: 0.2),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          taken == total ? AppColors.primary : AppColors.primary.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // Log All button
                   SizedBox(
@@ -201,18 +219,9 @@ class _LogScreenState extends State<LogScreen> {
                         padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            Icon(
-                              Icons.checklist_outlined,
-                              size: 56,
-                              color: AppColors.inactiveUpcoming.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
+                            Icon(Icons.checklist_outlined, size: 56, color: AppColors.inactiveUpcoming.withValues(alpha: 0.5)),
                             const SizedBox(height: 12),
-                            const Text(
-                              'No medications scheduled today',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
+                            const Text('No medications scheduled today', style: TextStyle(color: AppColors.textSecondary)),
                           ],
                         ),
                       ),
@@ -225,11 +234,12 @@ class _LogScreenState extends State<LogScreen> {
                       final med = matches.isEmpty ? null : matches.first;
                       final isTaken = log.status == 'taken';
                       final isMissed = log.status == 'missed';
+                      final isUpcoming = log.status == 'upcoming';
                       final dotColor = isTaken
                           ? AppColors.primary
                           : isMissed
-                          ? AppColors.missedAlert
-                          : const Color(0xFFCBD5E1);
+                              ? AppColors.missedAlert
+                              : AppColors.inactiveUpcoming;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -237,153 +247,87 @@ class _LogScreenState extends State<LogScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // Timeline dot
-                            Column(
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: dotColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                             ),
                             const SizedBox(width: 12),
                             // Card
                             Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).cardTheme.color,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: isMissed
-                                      ? Border(
-                                          left: BorderSide(
-                                            color: AppColors.missedAlert,
-                                            width: 3,
-                                          ),
-                                        )
-                                      : null,
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      blurRadius: 6,
-                                      offset: Offset(0, 2),
-                                      color: Colors.black12,
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color:
-                                            (isTaken
-                                                    ? AppColors.primary
-                                                    : isMissed
-                                                    ? AppColors.missedAlert
-                                                    : AppColors
-                                                          .inactiveUpcoming)
-                                                .withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(
-                                        Icons.medication_outlined,
-                                        color: isTaken
-                                            ? AppColors.primary
-                                            : isMissed
-                                            ? AppColors.missedAlert
-                                            : AppColors.inactiveUpcoming,
-                                        size: 22,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            med?.name ?? 'Medication',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            isMissed
-                                                ? 'Missed • ${_fmtTime(log.scheduledTime)}'
-                                                : '${med?.dosageStrength ?? ''}${med?.dosageUnit ?? ''} • ${_fmtTime(log.scheduledTime)}',
-                                            style: TextStyle(
-                                              color: isMissed
-                                                  ? AppColors.missedAlert
-                                                  : AppColors.textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    // Action button
-                                    if (log.status == 'upcoming')
-                                      GestureDetector(
-                                        onTap: () => context
-                                            .read<IntakeLogProvider>()
-                                            .markTaken(log),
-                                        child: Container(
-                                          width: 36,
-                                          height: 36,
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: AppColors.inactiveUpcoming,
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.check,
-                                            size: 18,
-                                            color: AppColors.inactiveUpcoming,
-                                          ),
-                                        ),
-                                      )
-                                    else if (log.status == 'taken')
+                              child: GestureDetector(
+                                onLongPress: () => _showActionSheet(context, log),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).cardTheme.color,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isMissed
+                                        ? const Border(left: BorderSide(color: AppColors.missedAlert, width: 3))
+                                        : isUpcoming
+                                            ? Border(left: BorderSide(color: AppColors.primary.withValues(alpha: 0.4), width: 3))
+                                            : null,
+                                    boxShadow: const [BoxShadow(blurRadius: 6, offset: Offset(0, 2), color: Colors.black12)],
+                                  ),
+                                  child: Row(
+                                    children: [
                                       Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.primary,
-                                          shape: BoxShape.circle,
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: (isTaken
+                                                  ? AppColors.primary
+                                                  : isMissed
+                                                      ? AppColors.missedAlert
+                                                      : AppColors.inactiveUpcoming)
+                                              .withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
-                                        child: const Icon(
-                                          Icons.check,
-                                          size: 18,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    else
-                                      GestureDetector(
-                                        onTap: () => context
-                                            .read<IntakeLogProvider>()
-                                            .markTaken(log),
-                                        child: Container(
-                                          width: 36,
-                                          height: 36,
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: AppColors.missedAlert,
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.refresh,
-                                            size: 18,
-                                            color: AppColors.missedAlert,
-                                          ),
+                                        child: Icon(
+                                          isTaken
+                                              ? Icons.check_circle_outline
+                                              : isMissed
+                                                  ? Icons.cancel_outlined
+                                                  : Icons.medication_outlined,
+                                          color: isTaken
+                                              ? AppColors.primary
+                                              : isMissed
+                                                  ? AppColors.missedAlert
+                                                  : AppColors.inactiveUpcoming,
+                                          size: 22,
                                         ),
                                       ),
-                                  ],
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              med?.name ?? 'Medication',
+                                              style: const TextStyle(fontWeight: FontWeight.w800),
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              isMissed
+                                                  ? 'Missed • ${_fmtTime(log.scheduledTime)}'
+                                                  : '${med?.dosageStrength ?? ''}${med?.dosageUnit ?? ''} • ${_fmtTime(log.scheduledTime)}',
+                                              style: TextStyle(
+                                                color: isMissed ? AppColors.missedAlert : AppColors.textSecondary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Action button
+                                      _ActionButton(
+                                        status: log.status,
+                                        onTaken: () => context.read<IntakeLogProvider>().markTaken(log),
+                                        onMissed: () => context.read<IntakeLogProvider>().markMissed(log),
+                                        onReset: () => _showActionSheet(context, log),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -400,9 +344,7 @@ class _LogScreenState extends State<LogScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                      ),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                     ),
                     child: const Row(
                       children: [
@@ -412,20 +354,11 @@ class _LogScreenState extends State<LogScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Reminder Tip',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                ),
-                              ),
+                              Text('Reminder Tip', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
                               SizedBox(height: 4),
                               Text(
                                 'Taking your medications with water helps absorption. Keep it up!',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,
-                                ),
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                               ),
                             ],
                           ),
@@ -448,5 +381,64 @@ class _LogScreenState extends State<LogScreen> {
     final hour12 = (dt.hour % 12 == 0) ? 12 : (dt.hour % 12);
     final ampm = dt.hour >= 12 ? 'PM' : 'AM';
     return '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $ampm';
+  }
+}
+
+/// Extracted action button widget for log rows.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.status,
+    required this.onTaken,
+    required this.onMissed,
+    required this.onReset,
+  });
+
+  final String status;
+  final VoidCallback onTaken;
+  final VoidCallback onMissed;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case 'taken':
+        // Tapping again allows undo via sheet
+        return GestureDetector(
+          onTap: onReset,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+            child: const Icon(Icons.check, size: 18, color: Colors.white),
+          ),
+        );
+      case 'missed':
+        // Tapping allows marking taken (retry)
+        return GestureDetector(
+          onTap: onTaken,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.missedAlert),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.refresh, size: 18, color: AppColors.missedAlert),
+          ),
+        );
+      default: // upcoming
+        return GestureDetector(
+          onTap: onTaken,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.inactiveUpcoming),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, size: 18, color: AppColors.inactiveUpcoming),
+          ),
+        );
+    }
   }
 }

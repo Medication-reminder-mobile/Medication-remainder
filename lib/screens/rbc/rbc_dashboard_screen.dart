@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -33,6 +34,40 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
     await context.read<RbcProvider>().loadEntries(user!.id!);
   }
 
+  // FIX: delete with undo snackbar — no black screen
+  Future<void> _deleteEntry(RbcEntryModel entry) async {
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (entry.id == null || userId == null) return;
+
+    await context.read<RbcProvider>().deleteEntry(entry.id!);
+    if (!mounted) return;
+
+    final err = context.read<RbcProvider>().errorMessage;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $err'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // FIX: undo snackbar — does NOT crash or cause black screen
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('RBC record deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            context.read<RbcProvider>().undoDelete(userId);
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rbcProvider = context.watch<RbcProvider>();
@@ -40,18 +75,15 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Menu not implemented'))),
+          onPressed: () {},
           icon: const Icon(Icons.menu),
           tooltip: 'Menu',
         ),
         title: const Text('MedRemind'),
         actions: [
+          // FIX: voice button now actually navigates
           IconButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Voice not implemented')),
-            ),
+            onPressed: () => context.go('/voice'),
             icon: const Icon(Icons.mic_none_outlined),
             tooltip: 'Voice',
           ),
@@ -69,7 +101,6 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Screen title
             Semantics(
               header: true,
               child: Text(
@@ -80,34 +111,30 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               'Monitor your red blood cell health over time.',
-              style: AppTextStyles.body(
-                context,
-              ).copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.body(context)
+                  .copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
 
-            // Gradient banner
             const _GradientBanner(),
             const SizedBox(height: 20),
 
-            if (rbcProvider.isLoading) ...[
+            // FIX: only show shimmer on initial load, NOT during delete
+            if (rbcProvider.isLoading && rbcProvider.entries.isEmpty) ...[
               _ShimmerGrid(),
             ] else if (rbcProvider.entries.isEmpty) ...[
               _EmptyState(),
             ] else ...[
-              // Latest reading section
               Text('Latest Reading', style: AppTextStyles.subheading(context)),
               const SizedBox(height: 12),
               _MetricGrid(entry: rbcProvider.latest!),
               const SizedBox(height: 20),
 
-              // Chart
               if (rbcProvider.entries.length >= 2) ...[
                 _ChartCard(entries: rbcProvider.entries),
                 const SizedBox(height: 20),
               ],
 
-              // History
               Text('History', style: AppTextStyles.subheading(context)),
               const SizedBox(height: 12),
               ...rbcProvider.entries.map(
@@ -115,9 +142,33 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _HistoryItem(
                     entry: e,
+                    // FIX: confirm before delete, then show undo snackbar
                     onDelete: () async {
-                      if (e.id == null) return;
-                      await context.read<RbcProvider>().deleteEntry(e.id!);
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Delete Record'),
+                          content: const Text(
+                            'Delete this RBC record? You can undo immediately after.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.missedAlert,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (ok == true && context.mounted) {
+                        await _deleteEntry(e);
+                      }
                     },
                   ),
                 ),
@@ -164,13 +215,13 @@ class _GradientBanner extends StatelessWidget {
           ],
         ),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Track Your Blood Health',
                   style: TextStyle(
                     color: Colors.white,
@@ -178,16 +229,16 @@ class _GradientBanner extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
+                SizedBox(height: 6),
+                Text(
                   'Monitor RBC, hemoglobin and hematocrit trends.',
                   style: TextStyle(color: Colors.white70),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          const Icon(Icons.bloodtype_outlined, color: Colors.white, size: 44),
+          SizedBox(width: 12),
+          Icon(Icons.bloodtype_outlined, color: Colors.white, size: 44),
         ],
       ),
     );
@@ -200,7 +251,6 @@ class _GradientBanner extends StatelessWidget {
 
 class _MetricGrid extends StatelessWidget {
   const _MetricGrid({required this.entry});
-
   final RbcEntryModel entry;
 
   @override
@@ -379,12 +429,10 @@ class _MetricCard extends StatelessWidget {
 
 class _ChartCard extends StatelessWidget {
   const _ChartCard({required this.entries});
-
   final List<RbcEntryModel> entries;
 
   @override
   Widget build(BuildContext context) {
-    // Take up to last 7 entries, reversed so oldest is first (left on chart)
     final chartEntries = entries.length > 7
         ? entries.sublist(0, 7).reversed.toList()
         : entries.reversed.toList();
@@ -393,12 +441,14 @@ class _ChartCard extends StatelessWidget {
       return FlSpot(e.key.toDouble(), e.value.rbcCount);
     }).toList();
 
-    final minY =
-        (chartEntries.map((e) => e.rbcCount).reduce((a, b) => a < b ? a : b) -
-                0.5)
-            .clamp(0.0, double.infinity);
-    final maxY =
-        chartEntries.map((e) => e.rbcCount).reduce((a, b) => a > b ? a : b) +
+    final minY = (chartEntries
+                .map((e) => e.rbcCount)
+                .reduce((a, b) => a < b ? a : b) -
+            0.5)
+        .clamp(0.0, double.infinity);
+    final maxY = chartEntries
+            .map((e) => e.rbcCount)
+            .reduce((a, b) => a > b ? a : b) +
         0.5;
 
     return Container(
@@ -407,7 +457,11 @@ class _ChartCard extends StatelessWidget {
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12),
+          BoxShadow(
+            blurRadius: 8,
+            offset: Offset(0, 2),
+            color: Colors.black12,
+          ),
         ],
       ),
       child: Column(
@@ -415,7 +469,10 @@ class _ChartCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('RBC Count Trend', style: AppTextStyles.subheading(context)),
+              Text(
+                'RBC Count Trend',
+                style: AppTextStyles.subheading(context),
+              ),
               const SizedBox(width: 8),
               Container(
                 width: 10,
@@ -463,11 +520,10 @@ class _ChartCard extends StatelessWidget {
                           return const SizedBox.shrink();
                         }
                         final date = chartEntries[idx].recordedAt;
-                        final label = _abbrevDate(date);
                         return Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(
-                            label,
+                            _abbrevDate(date),
                             style: const TextStyle(
                               fontSize: 10,
                               color: AppColors.textSecondary,
@@ -488,11 +544,11 @@ class _ChartCard extends StatelessWidget {
                       show: true,
                       getDotPainter: (spot, percent, bar, index) =>
                           FlDotCirclePainter(
-                            radius: 3.5,
-                            color: AppColors.primary,
-                            strokeWidth: 1.5,
-                            strokeColor: Colors.white,
-                          ),
+                        radius: 3.5,
+                        color: AppColors.primary,
+                        strokeWidth: 1.5,
+                        strokeColor: Colors.white,
+                      ),
                     ),
                     belowBarData: BarAreaData(
                       show: true,
@@ -517,18 +573,8 @@ class _ChartCard extends StatelessWidget {
 
   String _abbrevDate(DateTime dt) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}';
   }
@@ -597,26 +643,26 @@ class _HistoryItem extends StatelessWidget {
                     'Hct ${entry.hematocrit.toStringAsFixed(1)}%',
                     style: AppTextStyles.caption(context),
                   ),
+                  if (entry.note != null && entry.note!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.note!,
+                      style: AppTextStyles.caption(context).copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            PopupMenuButton<String>(
-              tooltip: 'Options',
-              onSelected: (value) {
-                if (value == 'delete') onDelete();
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, color: AppColors.missedAlert),
-                      SizedBox(width: 8),
-                      Text('Delete'),
-                    ],
-                  ),
-                ),
-              ],
+            // FIX: delete button directly visible — no need for popup menu
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: AppColors.missedAlert,
+              ),
+              tooltip: 'Delete record',
+              onPressed: onDelete,
             ),
           ],
         ),
@@ -626,18 +672,8 @@ class _HistoryItem extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
@@ -717,9 +753,8 @@ class _EmptyState extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Tap + to add your first entry.',
-                style: AppTextStyles.body(
-                  context,
-                ).copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.body(context)
+                    .copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -782,6 +817,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
     await context.read<RbcProvider>().addEntry(entry);
 
     if (!mounted) return;
+    // FIX: use Navigator.pop (not context.pop) for bottom sheet dismissal
     Navigator.of(context).pop();
   }
 
@@ -803,7 +839,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
             children: [
               Text('Add RBC Entry', style: AppTextStyles.subheading(context)),
               const SizedBox(height: 20),
-
               _NumericField(
                 controller: _rbcCtrl,
                 label: 'RBC Count (million/µL)',
@@ -812,7 +847,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 max: 20.0,
               ),
               const SizedBox(height: 14),
-
               _NumericField(
                 controller: _hgbCtrl,
                 label: 'Hemoglobin (g/dL)',
@@ -821,7 +855,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 max: 30.0,
               ),
               const SizedBox(height: 14),
-
               _NumericField(
                 controller: _hctCtrl,
                 label: 'Hematocrit (%)',
@@ -830,7 +863,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 max: 100.0,
               ),
               const SizedBox(height: 14),
-
               _NumericField(
                 controller: _mcvCtrl,
                 label: 'MCV (fL)',
@@ -839,7 +871,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 max: 200.0,
               ),
               const SizedBox(height: 14),
-
               TextFormField(
                 controller: _noteCtrl,
                 decoration: const InputDecoration(
@@ -849,7 +880,6 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
                 maxLines: 2,
               ),
               const SizedBox(height: 24),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

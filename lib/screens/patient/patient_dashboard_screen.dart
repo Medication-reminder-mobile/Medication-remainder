@@ -86,7 +86,14 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           children: [
             Text('Good morning, $name', style: AppTextStyles.heading(context).copyWith(fontSize: 26)),
             const SizedBox(height: 6),
-            Text('You have $left medications left for today.', style: AppTextStyles.body(context).copyWith(color: AppColors.textSecondary)),
+            Text(
+              left == 0
+                  ? 'All medications taken for today!'
+                  : 'You have $left medication${left == 1 ? '' : 's'} left for today.',
+              style: AppTextStyles.body(context).copyWith(
+                color: left == 0 ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Row 1: stats + actions
@@ -102,9 +109,17 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                           lineWidth: 8,
                           percent: percent,
                           circularStrokeCap: CircularStrokeCap.round,
-                          progressColor: AppColors.primary,
+                          // Color shifts red when adherence is low
+                          progressColor: percent >= 0.7
+                              ? AppColors.primary
+                              : percent >= 0.4
+                                  ? AppColors.warningRefill
+                                  : AppColors.missedAlert,
                           backgroundColor: AppColors.inactiveUpcoming.withValues(alpha: 0.25),
-                          center: Text('${(percent * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                          center: Text(
+                            '${(percent * 100).round()}%',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Text('Daily Goal', style: AppTextStyles.caption(context)),
@@ -148,19 +163,41 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 126,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemBuilder: (context, i) {
-                  final log = todayLogs.isEmpty ? null : todayLogs[i % todayLogs.length];
-                  if (log == null) return const SizedBox.shrink();
-                  return _ScheduleCard(log: log);
-                },
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemCount: todayLogs.isEmpty ? 0 : (todayLogs.length.clamp(1, 8)),
+
+            if (todayLogs.isEmpty)
+              _Card(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_available, size: 40, color: AppColors.inactiveUpcoming.withValues(alpha: 0.5)),
+                        const SizedBox(height: 8),
+                        Text('No medications scheduled today', style: AppTextStyles.body(context).copyWith(color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 126,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemBuilder: (context, i) {
+                    final log = todayLogs[i];
+                    return _ScheduleCard(
+                      log: log,
+                      medName: medsProvider.medications
+                          .where((m) => m.id == log.medicationId)
+                          .firstOrNull
+                          ?.name,
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemCount: todayLogs.length.clamp(0, 8),
+                ),
               ),
-            ),
 
             const SizedBox(height: 18),
             _GradientBanner(
@@ -171,8 +208,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
               trailing: const Icon(Icons.show_chart, color: Colors.white, size: 44),
             ),
 
-            const SizedBox(height: 14),
-            if (_note != null)
+            if (_note != null) ...[
+              const SizedBox(height: 14),
               _Card(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,6 +229,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                   ],
                 ),
               ),
+            ],
 
             if (refillLow.isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -227,8 +265,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
               _GroupHeader(icon: Icons.wb_twilight_outlined, title: 'Afternoon'),
               ..._timelineItems(context, medsProvider.medications, todayLogs, group: 'Afternoon'),
               const SizedBox(height: 8),
-              _GroupHeader(icon: Icons.nights_stay_outlined, title: 'Upcoming'),
-              ..._timelineItems(context, medsProvider.medications, todayLogs, group: 'Upcoming'),
+              _GroupHeader(icon: Icons.nights_stay_outlined, title: 'Evening'),
+              ..._timelineItems(context, medsProvider.medications, todayLogs, group: 'Evening'),
               const SizedBox(height: 12),
               _Card(
                 child: Row(
@@ -265,8 +303,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
 
     final now = DateTime.now();
     final sorted = [...logs]..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
-    final upcoming = sorted.where((l) => l.status == 'upcoming').toList(growable: false);
-    final next = upcoming.isEmpty ? null : upcoming.first;
+    final upcomingList = sorted.where((l) => l.status == 'upcoming').toList(growable: false);
+    final next = upcomingList.isEmpty ? null : upcomingList.first;
 
     bool inGroup(IntakeLogModel l) {
       if (group == null) return true;
@@ -275,15 +313,33 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       return switch (group) {
         'Morning' => h < 12,
         'Afternoon' => h >= 12 && h < 18,
-        _ => h >= 18 || l.status == 'upcoming',
+        _ => h >= 18,
       };
     }
 
-    return sorted.where(inGroup).map((log) {
+    final filtered = sorted.where(inGroup).toList(growable: false);
+
+    if (filtered.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'No medications in this period.',
+            style: AppTextStyles.body(context).copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      ];
+    }
+
+    return filtered.map((log) {
       final med = findMed(log.medicationId);
       final due = DateHelpers.combineDateAndTime(now, log.scheduledTime);
       final minutes = due.difference(now).inMinutes;
-      final highlight = (next?.id == log.id) && log.status == 'upcoming' && minutes >= 0 && minutes <= 15;
+      final isUpcoming = log.status == 'upcoming';
+      final highlight = (next?.id == log.id) && isUpcoming && minutes >= 0 && minutes <= 15;
+      // Active = upcoming and not yet missed (due in future or within grace window)
+      final isActive = isUpcoming && minutes > -30;
+      final isOverdue = isUpcoming && minutes <= -30;
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 10),
@@ -291,6 +347,27 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Active indicator stripe
+              if (isActive && !highlight)
+                Container(
+                  width: 4,
+                  height: 50,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              if (isOverdue)
+                Container(
+                  width: 4,
+                  height: 50,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.missedAlert,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
               PillIcon(
                 shape: med?.pillShape ?? 'capsule',
                 colorHex: med?.pillColor ?? '#00897B',
@@ -304,12 +381,23 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                   children: [
                     if (highlight)
                       Container(
+                        margin: const EdgeInsets.only(bottom: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: const Text('IN 15 MINS', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    if (isOverdue)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.missedAlert.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text('OVERDUE', style: TextStyle(color: AppColors.missedAlert, fontWeight: FontWeight.w800, fontSize: 12)),
                       ),
                     Text(med?.name ?? 'Medication', style: const TextStyle(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
@@ -367,6 +455,13 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
               title: const Text('Mark missed'),
               onTap: () => Navigator.pop(context, 'missed'),
             ),
+            // Allow un-marking if already taken or missed
+            if (log.status == 'taken' || log.status == 'missed')
+              ListTile(
+                leading: const Icon(Icons.undo_outlined, color: AppColors.inactiveUpcoming),
+                title: const Text('Reset to upcoming'),
+                onTap: () => Navigator.pop(context, 'reset'),
+              ),
             ListTile(
               leading: const Icon(Icons.close),
               title: const Text('Cancel'),
@@ -381,6 +476,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       await provider.markTaken(log);
     } else if (action == 'missed') {
       await provider.markMissed(log);
+    } else if (action == 'reset') {
+      await provider.markUpcoming(log); // ensure markUpcoming exists in your provider
     }
   }
 }
@@ -392,45 +489,42 @@ class _StatusWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color c;
-    String t;
     switch (log.status) {
       case 'taken':
-        c = AppColors.primary;
-        t = 'Taken';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Text('Taken', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12)),
+        );
       case 'missed':
-        c = AppColors.missedAlert;
-        t = 'Missed';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.missedAlert.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Text('Missed', style: TextStyle(color: AppColors.missedAlert, fontWeight: FontWeight.w800, fontSize: 12)),
+        );
       default:
-        c = AppColors.inactiveUpcoming;
-        t = 'Log';
+        return SizedBox(
+          height: 36,
+          child: OutlinedButton(
+            onPressed: () => context.read<IntakeLogProvider>().markTaken(log),
+            child: const Text('Log'),
+          ),
+        );
     }
-
-    if (log.status == 'upcoming') {
-      return SizedBox(
-        height: 36,
-        child: OutlinedButton(
-          onPressed: () => context.read<IntakeLogProvider>().markTaken(log),
-          child: const Text('Log'),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(t, style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12)),
-    );
   }
 }
 
 class _ScheduleCard extends StatelessWidget {
-  const _ScheduleCard({required this.log});
+  const _ScheduleCard({required this.log, this.medName});
 
   final IntakeLogModel log;
+  final String? medName;
 
   @override
   Widget build(BuildContext context) {
@@ -446,13 +540,17 @@ class _ScheduleCard extends StatelessWidget {
             : AppColors.inactiveUpcoming;
 
     return Semantics(
-      label: 'Schedule item',
+      label: 'Schedule item: ${medName ?? 'Medication'}, ${log.status}',
       child: Container(
         width: 190,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
+          // Highlight active (upcoming) cards with a subtle border
+          border: log.status == 'upcoming'
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5)
+              : null,
           boxShadow: const [BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12)],
         ),
         child: Column(
@@ -460,9 +558,28 @@ class _ScheduleCard extends StatelessWidget {
           children: [
             Text(_fmtTime(log.scheduledTime), style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            const Text('Medication', style: TextStyle(fontWeight: FontWeight.w900)),
+            Text(
+              medName ?? 'Medication',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 4),
-            Text('Status: ${log.status}', style: const TextStyle(color: AppColors.textSecondary)),
+            Text(
+              log.status == 'taken'
+                  ? 'Taken ✓'
+                  : log.status == 'missed'
+                      ? 'Missed'
+                      : 'Upcoming',
+              style: TextStyle(
+                color: log.status == 'taken'
+                    ? AppColors.primary
+                    : log.status == 'missed'
+                        ? AppColors.missedAlert
+                        : AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
             const Spacer(),
             Container(
               width: 28,
@@ -595,4 +712,3 @@ extension<T> on Iterable<T> {
     return it.current;
   }
 }
-

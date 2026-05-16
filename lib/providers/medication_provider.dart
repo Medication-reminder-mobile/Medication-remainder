@@ -15,6 +15,10 @@ class MedicationProvider extends ChangeNotifier {
   bool isLoading = false;
   String? errorMessage;
 
+  // FIX: keep a deleted item so the UI can offer undo without crashing
+  MedicationModel? _lastDeleted;
+  MedicationModel? get lastDeleted => _lastDeleted;
+
   Future<void> loadMedications(int userId) async {
     isLoading = true;
     errorMessage = null;
@@ -93,6 +97,8 @@ class MedicationProvider extends ChangeNotifier {
     try {
       final old = _findMedicationById(id);
       if (old != null) {
+        // FIX: save for undo before removing
+        _lastDeleted = old;
         await NotificationService.instance.cancelMedicationReminders(
           id,
           old.scheduledTimes.length,
@@ -104,30 +110,42 @@ class MedicationProvider extends ChangeNotifier {
           .toList(growable: false);
     } catch (e) {
       errorMessage = e.toString();
+      _lastDeleted = null;
     } finally {
       isLoading = false;
       notifyListeners();
     }
   }
 
+  // FIX: undo delete — re-inserts the medication into DB and list
+  Future<void> undoDelete() async {
+    final med = _lastDeleted;
+    if (med == null) return;
+    _lastDeleted = null;
+    await addMedication(med.copyWith(id: null));
+  }
+
+  // FIX: toggleStatus now correctly updates both DB and in-memory list
   Future<void> toggleStatus(int id, String status) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
     try {
-      final old = _findMedicationById(id);
       await _db.updateMedicationStatus(id, status);
+      // Update local list immediately so the UI reflects the change
       medications = medications
           .map((m) => m.id == id ? m.copyWith(status: status) : m)
           .toList(growable: false);
-      if (old != null) {
+
+      final updated = _findMedicationById(id);
+      if (updated != null) {
         if (status == 'paused') {
           await NotificationService.instance.cancelMedicationReminders(
             id,
-            old.scheduledTimes.length,
+            updated.scheduledTimes.length,
           );
         } else if (status == 'active') {
-          await _scheduleForMedication(old.copyWith(status: 'active'));
+          await _scheduleForMedication(updated);
         }
       }
     } catch (e) {

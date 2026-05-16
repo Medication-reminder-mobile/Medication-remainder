@@ -18,10 +18,18 @@ class MedsScreen extends StatefulWidget {
 
 class _MedsScreenState extends State<MedsScreen> {
   bool _loaded = false;
+  // FIX: search controller now properly triggers setState via listener
   final _search = TextEditingController();
   String _filter = 'All';
 
   final _filters = ['All', 'Daily', 'Weekly', 'As Needed'];
+
+  @override
+  void initState() {
+    super.initState();
+    // FIX: attach listener so search bar actually filters results
+    _search.addListener(() => setState(() {}));
+  }
 
   @override
   void didChangeDependencies() {
@@ -56,9 +64,74 @@ class _MedsScreenState extends State<MedsScreen> {
           _filter == 'All' ||
           (_filter == 'Daily' && m.frequency.toLowerCase() == 'daily') ||
           (_filter == 'Weekly' && m.frequency.toLowerCase() == 'weekly') ||
-          (_filter == 'As Needed' && m.frequency.toLowerCase() == 'as needed');
+          (_filter == 'As Needed' &&
+              m.frequency.toLowerCase() == 'as needed');
       return matchSearch && matchFilter;
     }).toList();
+  }
+
+  // FIX: delete with undo snackbar — no more crash or black screen
+  Future<void> _deleteMed(MedicationModel med) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Medication'),
+        content: Text('Remove ${med.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.missedAlert),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    await context.read<MedicationProvider>().deleteMedication(med.id!);
+    if (!mounted) return;
+
+    final err = context.read<MedicationProvider>().errorMessage;
+    if (err != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+
+    // FIX: show undo snackbar — tapping Undo re-inserts the medication
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${med.name} deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            context.read<MedicationProvider>().undoDelete();
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  // FIX: toggle active/inactive directly from list
+  Future<void> _toggleStatus(MedicationModel med) async {
+    final newStatus = med.status == 'paused' ? 'active' : 'paused';
+    await context.read<MedicationProvider>().toggleStatus(med.id!, newStatus);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${med.name} ${newStatus == 'active' ? 'activated' : 'paused'}',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -88,7 +161,10 @@ class _MedsScreenState extends State<MedsScreen> {
                 children: [
                   const Text(
                     'My Medications',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   const Text(
@@ -99,20 +175,30 @@ class _MedsScreenState extends State<MedsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Search
+                  // FIX: search bar now works — listener attached in initState
                   TextField(
                     controller: _search,
-                    onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       hintText: 'Search medications...',
                       prefixIcon: const Icon(
                         Icons.search,
                         color: AppColors.textSecondary,
                       ),
+                      // FIX: add clear button when there is text
+                      suffixIcon: _search.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _search.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
                       filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFF1A1A1A)
-                          : const Color(0xFFF1F5F9),
+                      fillColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF1A1A1A)
+                              : const Color(0xFFF1F5F9),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -144,9 +230,9 @@ class _MedsScreenState extends State<MedsScreen> {
                                 border: Border.all(
                                   color: selected
                                       ? AppColors.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.outlineVariant,
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant,
                                 ),
                               ),
                               child: Text(
@@ -154,7 +240,9 @@ class _MedsScreenState extends State<MedsScreen> {
                                 style: TextStyle(
                                   color: selected
                                       ? Colors.white
-                                      : Theme.of(context).colorScheme.onSurface,
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
                                 ),
@@ -177,12 +265,12 @@ class _MedsScreenState extends State<MedsScreen> {
                       itemBuilder: (context, index) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Shimmer.fromColors(
-                          baseColor:
-                              Theme.of(context).brightness == Brightness.dark
+                          baseColor: Theme.of(context).brightness ==
+                                  Brightness.dark
                               ? const Color(0xFF232323)
                               : const Color(0xFFE5E7EB),
-                          highlightColor:
-                              Theme.of(context).brightness == Brightness.dark
+                          highlightColor: Theme.of(context).brightness ==
+                                  Brightness.dark
                               ? const Color(0xFF2D2D2D)
                               : const Color(0xFFF3F4F6),
                           child: Container(
@@ -196,71 +284,44 @@ class _MedsScreenState extends State<MedsScreen> {
                       ),
                     )
                   : meds.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.medication_outlined,
-                            size: 64,
-                            color: AppColors.inactiveUpcoming.withValues(
-                              alpha: 0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No medications found',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () => context.go('/meds/add'),
-                            child: const Text('Add your first medication'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: meds.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) => _MedTile(
-                        med: meds[i],
-                        onDelete: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text('Delete Medication'),
-                              content: Text('Remove ${meds[i].name}?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.medication_outlined,
+                                size: 64,
+                                color: AppColors.inactiveUpcoming
+                                    .withValues(alpha: 0.4),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No medications found',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 16,
                                 ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      color: AppColors.missedAlert,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true && context.mounted) {
-                            await context
-                                .read<MedicationProvider>()
-                                .deleteMedication(meds[i].id!);
-                          }
-                        },
-                      ),
-                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => context.go('/meds/add'),
+                                child: const Text('Add your first medication'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: meds.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, i) => _MedTile(
+                            med: meds[i],
+                            onDelete: () => _deleteMed(meds[i]),
+                            // FIX: pass toggle callback so active/inactive works
+                            onToggleStatus: () => _toggleStatus(meds[i]),
+                          ),
+                        ),
             ),
           ],
         ),
@@ -275,14 +336,20 @@ class _MedsScreenState extends State<MedsScreen> {
 }
 
 class _MedTile extends StatelessWidget {
-  const _MedTile({required this.med, required this.onDelete});
+  const _MedTile({
+    required this.med,
+    required this.onDelete,
+    required this.onToggleStatus,
+  });
   final MedicationModel med;
   final VoidCallback onDelete;
+  final VoidCallback onToggleStatus;
 
   @override
   Widget build(BuildContext context) {
     final paused = med.status == 'paused';
-    final statusColor = paused ? AppColors.inactiveUpcoming : AppColors.primary;
+    final statusColor =
+        paused ? AppColors.inactiveUpcoming : AppColors.primary;
 
     return Semantics(
       button: true,
@@ -327,21 +394,41 @@ class _MedTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            paused ? 'PAUSED' : 'ACTIVE',
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
+                        // FIX: status badge is now tappable to toggle active/paused
+                        GestureDetector(
+                          onTap: onToggleStatus,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  paused ? 'PAUSED' : 'ACTIVE',
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  paused
+                                      ? Icons.pause_circle_outline
+                                      : Icons.check_circle_outline,
+                                  size: 12,
+                                  color: statusColor,
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -383,14 +470,47 @@ class _MedTile extends StatelessWidget {
                 onSelected: (v) {
                   if (v == 'edit') context.go('/meds/edit/${med.id ?? 0}');
                   if (v == 'delete') onDelete();
+                  if (v == 'toggle') onToggleStatus();
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                itemBuilder: (_) => [
                   PopupMenuItem(
+                    value: 'toggle',
+                    child: Row(
+                      children: [
+                        Icon(
+                          paused
+                              ? Icons.play_circle_outline
+                              : Icons.pause_circle_outline,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(paused ? 'Activate' : 'Pause'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(value: 'edit', child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  )),
+                  const PopupMenuItem(
                     value: 'delete',
-                    child: Text(
-                      'Delete',
-                      style: TextStyle(color: AppColors.missedAlert),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: AppColors.missedAlert,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Delete',
+                          style: TextStyle(color: AppColors.missedAlert),
+                        ),
+                      ],
                     ),
                   ),
                 ],

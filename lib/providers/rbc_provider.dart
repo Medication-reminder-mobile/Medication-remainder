@@ -12,6 +12,10 @@ class RbcProvider extends ChangeNotifier {
   bool isLoading = false;
   String? errorMessage;
 
+  // FIX: keep last deleted for potential undo
+  RbcEntryModel? _lastDeleted;
+  RbcEntryModel? get lastDeleted => _lastDeleted;
+
   Future<void> loadEntries(int userId) async {
     isLoading = true;
     errorMessage = null;
@@ -42,18 +46,35 @@ class RbcProvider extends ChangeNotifier {
   }
 
   Future<void> deleteEntry(int id) async {
-    isLoading = true;
+    // FIX: do NOT set isLoading=true for delete — it was causing the black
+    // screen because the whole list re-rendered into shimmer/loading state
+    // while the delete was in progress. Instead update optimistically.
     errorMessage = null;
+
+    // Optimistic removal — remove from list immediately
+    final target = entries.where((e) => e.id == id).firstOrNull;
+    if (target == null) return;
+    _lastDeleted = target;
+    entries = entries.where((e) => e.id != id).toList(growable: false);
     notifyListeners();
+
     try {
       await _db.deleteRbcEntry(id);
-      entries = entries.where((e) => e.id != id).toList(growable: false);
     } catch (e) {
+      // FIX: if DB delete fails, restore the entry
       errorMessage = e.toString();
-    } finally {
-      isLoading = false;
+      entries = [target, ...entries];
+      _lastDeleted = null;
       notifyListeners();
     }
+  }
+
+  /// Undo the last deletion by re-inserting the entry.
+  Future<void> undoDelete(int userId) async {
+    final entry = _lastDeleted;
+    if (entry == null) return;
+    _lastDeleted = null;
+    await addEntry(entry.copyWith(id: null));
   }
 
   /// Latest entry, or null if none.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/db_service.dart';
 import '../services/session_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -46,11 +47,7 @@ class AuthProvider extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
     try {
-      final user = await _auth.login(
-        email,
-        password,
-        rememberMe: rememberMe,
-      );
+      final user = await _auth.login(email, password, rememberMe: rememberMe);
       if (user == null) {
         errorMessage = 'Invalid email or password';
       } else {
@@ -64,7 +61,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> register(String name, String email, String password, String role) async {
+  Future<void> register(
+    String name,
+    String email,
+    String password,
+    String role,
+  ) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -97,5 +99,41 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-}
 
+  /// Updates the current user's name and email in DB + session.
+  Future<void> updateUser(String name, String email) async {
+    if (currentUser == null) return;
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final updated = currentUser!.copyWith(name: name, email: email);
+      await DbService.instance.updateUser(updated);
+      await _session.saveSession(updated);
+      currentUser = updated;
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Deletes all user data from DB and clears the session.
+  Future<void> deleteAccount() async {
+    if (currentUser?.id == null) return;
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      await DbService.instance.deleteUser(currentUser!.id!);
+      await _auth.logout();
+      currentUser = null;
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+}
