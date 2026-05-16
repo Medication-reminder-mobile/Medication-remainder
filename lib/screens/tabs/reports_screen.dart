@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../models/intake_log_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/intake_log_provider.dart';
 import '../../services/db_service.dart';
@@ -41,8 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       final streak = await DbService.instance.getCurrentStreak(userId);
       final logs = await DbService.instance.getLogsByUser(userId);
-      final weekly = _buildWeeklyPulse(logs, now);
-      final monthStatus = _buildMonthDayStatus(logs, now);
+      final weekly = _buildWeeklyPulse(logs, now);      final monthStatus = _buildMonthDayStatus(logs, now);
       if (!mounted) return;
       setState(() {
         _stats = s;
@@ -71,13 +71,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     await VoiceService.instance.speak(summary);
   }
 
-  List<double> _buildWeeklyPulse(List<dynamic> logs, DateTime now) {
+  List<double> _buildWeeklyPulse(List<IntakeLogModel> logs, DateTime now) {
     final start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
-    final byDate = <String, List<dynamic>>{};
+    final byDate = <String, List<IntakeLogModel>>{};
     for (final log in logs) {
       final date = DateTime.tryParse(log.date);
       if (date == null || date.isBefore(start)) continue;
-      byDate.putIfAbsent(log.date as String, () => []).add(log);
+      byDate.putIfAbsent(log.date, () => []).add(log);
     }
 
     return List<double>.generate(7, (i) {
@@ -90,12 +90,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
   }
 
-  Map<int, String> _buildMonthDayStatus(List<dynamic> logs, DateTime now) {
-    final byDate = <String, List<dynamic>>{};
+  Map<int, String> _buildMonthDayStatus(List<IntakeLogModel> logs, DateTime now) {
+    final byDate = <String, List<IntakeLogModel>>{};
     for (final log in logs) {
       final date = DateTime.tryParse(log.date);
       if (date == null || date.year != now.year || date.month != now.month) continue;
-      byDate.putIfAbsent(log.date as String, () => []).add(log);
+      byDate.putIfAbsent(log.date, () => []).add(log);
     }
     final result = <int, String>{};
     byDate.forEach((date, entries) {

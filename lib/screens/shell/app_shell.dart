@@ -17,6 +17,8 @@ class AppShell extends StatelessWidget {
     if (location.startsWith('/reports')) return 3;
     if (location.startsWith('/rbc')) return 4;
     if (location.startsWith('/profile')) return 5;
+    if (location.startsWith('/caregiver')) return 0;
+    if (location.startsWith('/voice')) return 0;
     return 0;
   }
 

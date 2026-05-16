@@ -3,8 +3,6 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'
-    show databaseFactoryFfiWeb;
 
 import '../core/utils/date_helpers.dart';
 import '../models/caregiver_task_model.dart';
@@ -53,12 +51,11 @@ class DbService {
       final dbPath = await sqflite.databaseFactory.getDatabasesPath();
       path = p.join(dbPath, _dbName);
     }
-
     return sqflite.openDatabase(
       path,
       version: _dbVersion,
       onConfigure: (db) async {
-        if (!kIsWeb) await db.execute('PRAGMA foreign_keys = ON;');
+        await db.execute('PRAGMA foreign_keys = ON;');
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -150,10 +147,7 @@ CREATE TABLE doctor_notes (
   void _configureDatabaseFactory() {
     if (_factoryConfigured) return;
 
-    if (kIsWeb) {
-      // Use WASM-based SQLite for web.
-      sqflite.databaseFactory = databaseFactoryFfiWeb;
-    } else {
+    if (!kIsWeb) {
       final isDesktop =
           defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
@@ -163,6 +157,7 @@ CREATE TABLE doctor_notes (
         sqfliteFfiInit();
         sqflite.databaseFactory = databaseFactoryFfi;
       }
+      // On Android/iOS, sqflite works natively — no factory override needed.
     }
 
     _factoryConfigured = true;

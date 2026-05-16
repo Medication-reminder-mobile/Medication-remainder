@@ -588,7 +588,11 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-extension<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+extension<T> on Iterable<T> {
+  T? get firstOrNull {
+    final it = iterator;
+    if (!it.moveNext()) return null;
+    return it.current;
+  }
 }
 

@@ -151,7 +151,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      initialValue: _frequency,
+                      value: _frequency,
                       decoration: const InputDecoration(labelText: 'Frequency'),
                       items: const [
                         DropdownMenuItem(value: 'daily', child: Text('Daily')),
@@ -171,7 +171,7 @@ class _MedsEditScreenState extends State<MedsEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      initialValue: _shape,
+                      value: _shape,
                       decoration: const InputDecoration(
                         labelText: 'Pill shape',
                       ),
