@@ -26,16 +26,22 @@ class AppShell extends StatelessWidget {
     switch (idx) {
       case 0:
         context.go('/home');
+        return;
       case 1:
         context.go('/meds');
+        return;
       case 2:
         context.go('/log');
+        return;
       case 3:
         context.go('/reports');
+        return;
       case 4:
         context.go('/rbc');
+        return;
       case 5:
         context.go('/profile');
+        return;
       default:
         context.go('/home');
     }

@@ -52,8 +52,9 @@ class RbcProvider extends ChangeNotifier {
     errorMessage = null;
 
     // Optimistic removal — remove from list immediately
-    final target = entries.where((e) => e.id == id).firstOrNull;
-    if (target == null) return;
+    final index = entries.indexWhere((e) => e.id == id);
+    if (index < 0) return;
+    final target = entries[index];
     _lastDeleted = target;
     entries = entries.where((e) => e.id != id).toList(growable: false);
     notifyListeners();

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/utils/menu_helpers.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
@@ -15,7 +17,8 @@ class CaregiverDashboardScreen extends StatefulWidget {
   const CaregiverDashboardScreen({super.key});
 
   @override
-  State<CaregiverDashboardScreen> createState() => _CaregiverDashboardScreenState();
+  State<CaregiverDashboardScreen> createState() =>
+      _CaregiverDashboardScreenState();
 }
 
 class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
@@ -50,21 +53,28 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
     final caregiver = context.watch<CaregiverProvider>();
     final patients = caregiver.linkedPatients;
     final tasks = caregiver.tasks;
-    final filtered = patients.where((p) {
-      final q = _search.text.trim().toLowerCase();
-      if (q.isEmpty) return true;
-      return p.name.toLowerCase().contains(q);
-    }).toList(growable: false);
+    final filtered = patients
+        .where((p) {
+          final q = _search.text.trim().toLowerCase();
+          if (q.isEmpty) return true;
+          return p.name.toLowerCase().contains(q);
+        })
+        .toList(growable: false);
 
     final active = patients.length;
-    final adherence = patients.isEmpty ? 0.92 : 0.72 + (0.25 * math.min(1, patients.length / 10));
+    final adherence = patients.isEmpty
+        ? 0.92
+        : 0.72 + (0.25 * math.min(1, patients.length / 10));
 
-    final urgentNames = patients.take(3).map((e) => e.name.split(' ').first).toList(growable: false);
+    final urgentNames = patients
+        .take(3)
+        .map((e) => e.name.split(' ').first)
+        .toList(growable: false);
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Menu not implemented'))),
+          onPressed: () => showAppMenu(context),
           icon: const Icon(Icons.menu),
           tooltip: 'Menu',
         ),
@@ -83,7 +93,10 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               padding: const EdgeInsets.only(right: 12),
               child: CircleAvatar(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.16),
-                child: const Icon(Icons.person_outline, color: AppColors.primary),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ),
@@ -94,9 +107,17 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Caregiver Dashboard', style: AppTextStyles.heading(context).copyWith(fontSize: 24)),
+            Text(
+              'Caregiver Dashboard',
+              style: AppTextStyles.heading(context).copyWith(fontSize: 24),
+            ),
             const SizedBox(height: 6),
-            Text('Monitoring $active active patients today.', style: AppTextStyles.body(context).copyWith(color: AppColors.textSecondary)),
+            Text(
+              'Monitoring $active active patients today.',
+              style: AppTextStyles.body(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 14),
             TextField(
               controller: _search,
@@ -117,63 +138,94 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
               onReview: () => context.go('/caregiver/patients'),
             ),
             const SizedBox(height: 16),
-            Text('OVERALL ADHERENCE RATE', style: AppTextStyles.caption(context).copyWith(letterSpacing: 0.8)),
+            Text(
+              'OVERALL ADHERENCE RATE',
+              style: AppTextStyles.caption(
+                context,
+              ).copyWith(letterSpacing: 0.8),
+            ),
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${(adherence * 100).round()}%', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                Text(
+                  '${(adherence * 100).round()}%',
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: SizedBox(
                     height: 86,
-                    child: _WeeklyBarChart(values: _fakeWeeklyPatients(patients.length)),
+                    child: _WeeklyBarChart(
+                      values: _fakeWeeklyPatients(patients.length),
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
             _TealSummaryCard(
-              text: '${math.max(1, patients.length ~/ 2)} Patients\nPerfect Adherence Today',
+              text:
+                  '${math.max(1, patients.length ~/ 2)} Patients\nPerfect Adherence Today',
             ),
             const SizedBox(height: 18),
             Row(
               children: [
-                Text('Patient Roster', style: AppTextStyles.subheading(context)),
+                Text(
+                  'Patient Roster',
+                  style: AppTextStyles.subheading(context),
+                ),
                 const Spacer(),
-                TextButton(onPressed: () => context.go('/reports'), child: const Text('View Full Report  ›')),
+                TextButton(
+                  onPressed: () => context.go('/reports'),
+                  child: const Text('View Full Report  ›'),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            ...filtered.map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _PatientCard(
-                    name: p.name,
-                    lastActivity: '${math.max(1, p.id ?? 1) % 12}h ago',
-                    adherence: 0.55 + (0.45 * (((p.id ?? 1) % 10) / 10)),
-                    onTap: () => context.go('/caregiver/patient-meds/${p.id ?? 0}'),
-                    onUnlink: () async {
-                      final caregiverId = context.read<AuthProvider>().currentUser?.id;
-                      if (caregiverId == null || p.id == null) return;
-                      await DbService.instance.unlinkPatient(caregiverId, p.id!);
-                      await caregiver.loadLinkedPatients(caregiverId);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unlinked')));
-                    },
-                  ),
-                )),
+            ...filtered.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _PatientCard(
+                  name: p.name,
+                  lastActivity: '${math.max(1, p.id ?? 1) % 12}h ago',
+                  adherence: 0.55 + (0.45 * (((p.id ?? 1) % 10) / 10)),
+                  onTap: () =>
+                      context.go('/caregiver/patient-meds/${p.id ?? 0}'),
+                  onUnlink: () async {
+                    final caregiverId = context
+                        .read<AuthProvider>()
+                        .currentUser
+                        ?.id;
+                    if (caregiverId == null || p.id == null) return;
+                    await DbService.instance.unlinkPatient(caregiverId, p.id!);
+                    await caregiver.loadLinkedPatients(caregiverId);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Unlinked')));
+                  },
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
             Text('Caregiver Tasks', style: AppTextStyles.subheading(context)),
             const SizedBox(height: 8),
-            ...tasks.map((t) => _TaskItem(
-                  text: t.description,
-                  priority: t.priority,
-                  done: t.isDone,
-                  onToggle: (v) {
-                    if (t.id == null) return;
-                    context.read<CaregiverProvider>().toggleTask(t.id!, v);
-                  },
-                )),
+            ...tasks.map(
+              (t) => _TaskItem(
+                text: t.description,
+                priority: t.priority,
+                done: t.isDone,
+                onToggle: (v) {
+                  if (t.id == null) return;
+                  context.read<CaregiverProvider>().toggleTask(t.id!, v);
+                },
+              ),
+            ),
             const SizedBox(height: 60),
           ],
         ),
@@ -188,12 +240,19 @@ class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
 
   List<double> _fakeWeeklyPatients(int count) {
     final base = 0.55 + (0.35 * math.min(1, count / 10));
-    return List.generate(7, (i) => (base + (i.isEven ? 0.06 : -0.03)).clamp(0.3, 0.98));
+    return List.generate(
+      7,
+      (i) => (base + (i.isEven ? 0.06 : -0.03)).clamp(0.3, 0.98),
+    );
   }
 }
 
 class _UrgentCard extends StatelessWidget {
-  const _UrgentCard({required this.missedCount, required this.names, required this.onReview});
+  const _UrgentCard({
+    required this.missedCount,
+    required this.names,
+    required this.onReview,
+  });
 
   final int missedCount;
   final List<String> names;
@@ -215,10 +274,15 @@ class _UrgentCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Urgent: $missedCount Missed Doses Detected', style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  'Urgent: $missedCount Missed Doses Detected',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 6),
                 Text(
-                  names.isEmpty ? 'No names available.' : 'Patients: ${names.join(', ')}',
+                  names.isEmpty
+                      ? 'No names available.'
+                      : 'Patients: ${names.join(', ')}',
                   style: const TextStyle(color: Color(0xFF7F1D1D)),
                 ),
               ],
@@ -226,7 +290,9 @@ class _UrgentCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.missedAlert),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.missedAlert,
+            ),
             onPressed: onReview,
             child: const Text('Review Now'),
           ),
@@ -254,7 +320,13 @@ class _TealSummaryCard extends StatelessWidget {
           const Icon(Icons.shield_outlined, color: Colors.white),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ],
       ),
@@ -293,33 +365,61 @@ class _PatientCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).cardTheme.color,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12)],
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 8,
+                offset: Offset(0, 2),
+                color: Colors.black12,
+              ),
+            ],
           ),
           child: Row(
             children: [
               CircleAvatar(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.16),
-                child: const Icon(Icons.person_outline, color: AppColors.primary),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
+                    Text(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
                     const SizedBox(height: 4),
-                    Text('Last Activity: $lastActivity', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      'Last Activity: $lastActivity',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: badge.color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('$pct% ${badge.label}', style: TextStyle(color: badge.color, fontWeight: FontWeight.w900, fontSize: 12)),
+                child: Text(
+                  '$pct% ${badge.label}',
+                  style: TextStyle(
+                    color: badge.color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
               ),
               PopupMenuButton<String>(
                 tooltip: 'Patient actions',
@@ -354,7 +454,12 @@ class _Badge {
 }
 
 class _TaskItem extends StatelessWidget {
-  const _TaskItem({required this.text, required this.priority, required this.done, required this.onToggle});
+  const _TaskItem({
+    required this.text,
+    required this.priority,
+    required this.done,
+    required this.onToggle,
+  });
 
   final String text;
   final String priority;
@@ -375,19 +480,27 @@ class _TaskItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12)],
+        boxShadow: const [
+          BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12),
+        ],
       ),
       child: Row(
         children: [
           Semantics(
             label: done ? 'Task complete' : 'Task not complete',
-            child: Checkbox(value: done, onChanged: (v) => onToggle(v ?? false)),
+            child: Checkbox(
+              value: done,
+              onChanged: (v) => onToggle(v ?? false),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(decoration: done ? TextDecoration.lineThrough : null, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                decoration: done ? TextDecoration.lineThrough : null,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           Container(
@@ -396,8 +509,15 @@ class _TaskItem extends StatelessWidget {
               color: badge.color.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(badge.label, style: TextStyle(color: badge.color, fontWeight: FontWeight.w900, fontSize: 12)),
-          )
+            child: Text(
+              badge.label,
+              style: TextStyle(
+                color: badge.color,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -426,7 +546,7 @@ class _WeeklyBarChart extends StatelessWidget {
                 width: 10,
                 borderRadius: BorderRadius.circular(6),
                 color: AppColors.primary.withValues(alpha: 0.9),
-              )
+              ),
             ],
           ),
         ),
@@ -436,4 +556,3 @@ class _WeeklyBarChart extends StatelessWidget {
     );
   }
 }
-

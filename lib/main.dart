@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -8,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/caregiver_provider.dart';
 import 'providers/intake_log_provider.dart';
+import 'providers/locale_provider.dart';
 import 'providers/medication_provider.dart';
 import 'providers/rbc_provider.dart';
 import 'providers/theme_provider.dart';
@@ -38,6 +40,7 @@ class MedRemindApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => MedicationProvider()),
         ChangeNotifierProvider(create: (_) => IntakeLogProvider()),
         ChangeNotifierProvider(create: (_) => CaregiverProvider()),
@@ -46,8 +49,8 @@ class MedRemindApp extends StatelessWidget {
           update: (context, auth, previous) => previous ?? createRouter(auth),
         ),
       ],
-      child: Consumer2<ThemeProvider, GoRouter>(
-        builder: (context, theme, router, _) {
+      child: Consumer3<ThemeProvider, LocaleProvider, GoRouter>(
+        builder: (context, theme, locale, router, _) {
           return MaterialApp.router(
             title: 'MedRemind',
             debugShowCheckedModeBanner: false,
@@ -55,6 +58,21 @@ class MedRemindApp extends StatelessWidget {
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: theme.themeMode,
+            locale: locale.locale,
+            supportedLocales: const [
+              Locale('en'),
+              Locale('am'),
+              Locale('ar'),
+              Locale('fr'),
+              Locale('es'),
+              Locale('pt'),
+              Locale('sw'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             routerConfig: router,
           );
         },

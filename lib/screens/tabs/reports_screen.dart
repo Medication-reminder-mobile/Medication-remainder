@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -9,9 +10,11 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/menu_helpers.dart';
 import '../../models/intake_log_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/intake_log_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../services/db_service.dart';
 import '../../services/voice_service.dart';
 
@@ -48,6 +51,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (userId == null) return;
     setState(() => _loading = true);
     try {
+      await context.read<IntakeLogProvider>().loadAdherenceStats(userId);
       final now = DateTime.now();
       final s = await DbService.instance.getMonthlyStats(
         userId,
@@ -76,14 +80,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _voiceSummary() async {
-    final adherence = context.read<IntakeLogProvider>().adherenceRate;
+    final authProvider = context.read<AuthProvider>();
+    final logProvider = context.read<IntakeLogProvider>();
+    final localeProvider = context.read<LocaleProvider>();
+    final userId = authProvider.currentUser?.id;
+
+    if (userId != null) {
+      await logProvider.loadAdherenceStats(userId);
+    }
+    if (!mounted) return;
+
+    final adherence = logProvider.adherenceRate;
     final pct = (adherence * 100).round();
     final perfect = _stats['perfect'] ?? 0;
     final missed = _stats['missed'] ?? 0;
     final summary =
         'Your adherence report. Overall adherence is $pct percent. '
         'You had $perfect perfect days and $missed missed days this month. Keep it up!';
-    await VoiceService.instance.speak(summary);
+    await VoiceService.instance.speakForced(
+      summary,
+      languageCode: localeProvider.voiceLocale,
+    );
   }
 
   /// Generates a PDF report and shares/saves it.
@@ -472,8 +489,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final byDate = <String, List<IntakeLogModel>>{};
     for (final log in logs) {
       final date = DateTime.tryParse(log.date);
-      if (date == null || date.year != now.year || date.month != now.month)
+      if (date == null || date.year != now.year || date.month != now.month) {
         continue;
+      }
       byDate.putIfAbsent(log.date, () => []).add(log);
     }
     final result = <int, String>{};
@@ -517,12 +535,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => showAppMenu(context),
+        ),
         title: const Text('MedRemind'),
         actions: [
           IconButton(
             icon: const Icon(Icons.mic_none_outlined),
-            onPressed: () {},
+            onPressed: () => context.go('/voice'),
           ),
         ],
       ),
@@ -696,8 +717,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                         'Sun',
                                       ];
                                       final i = v.toInt();
-                                      if (i < 0 || i >= days.length)
+                                      if (i < 0 || i >= days.length) {
                                         return const SizedBox.shrink();
+                                      }
                                       return Text(
                                         days[i],
                                         style: const TextStyle(
@@ -717,7 +739,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   barWidth: 3,
                                   dotData: FlDotData(
                                     show: true,
-                                    getDotPainter: (_, __, ___, ____) =>
+                                    getDotPainter: (_, _, _, _) =>
                                         FlDotCirclePainter(
                                           radius: 4,
                                           color: AppColors.primary,
@@ -986,13 +1008,19 @@ class _CalendarHeatmap extends StatelessWidget {
     final trailing = (7 - (totalCells % 7)) % 7;
 
     Color dayColor(int? day) {
-      if (day == null) return Colors.transparent;
+      if (day == null) {
+        return Colors.transparent;
+      }
       final status = dayStatus[day];
-      if (status == 'perfect') return AppColors.primary.withValues(alpha: 0.95);
-      if (status == 'partial')
+      if (status == 'perfect') {
+        return AppColors.primary.withValues(alpha: 0.95);
+      }
+      if (status == 'partial') {
         return AppColors.warningRefill.withValues(alpha: 0.9);
-      if (status == 'missed')
+      }
+      if (status == 'missed') {
         return AppColors.missedAlert.withValues(alpha: 0.9);
+      }
       return Theme.of(
         context,
       ).colorScheme.outlineVariant.withValues(alpha: 0.4);

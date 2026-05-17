@@ -9,13 +9,20 @@ class VoiceService {
   bool isEnabled = false;
   bool _initialized = false;
 
-  Future<void> initialize() async {
-    if (_initialized) return;
-    await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.45);
-    await _tts.setVolume(1.0);
-    await _tts.setPitch(1.0);
-    _initialized = true;
+  Future<void> initialize({String languageCode = 'en-US'}) async {
+    if (!_initialized) {
+      await _tts.setLanguage(languageCode);
+      await _tts.setSpeechRate(0.45);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
+      _initialized = true;
+    } else {
+      await _tts.setLanguage(languageCode);
+    }
+  }
+
+  Future<void> setLanguage(String languageCode) async {
+    await initialize(languageCode: languageCode);
   }
 
   Future<void> speak(String text) async {
@@ -24,8 +31,8 @@ class VoiceService {
     await _tts.speak(text);
   }
 
-  Future<void> speakForced(String text) async {
-    await initialize();
+  Future<void> speakForced(String text, {String languageCode = 'en-US'}) async {
+    await initialize(languageCode: languageCode);
     await _tts.stop();
     await _tts.speak(text);
   }

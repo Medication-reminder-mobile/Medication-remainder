@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../core/utils/menu_helpers.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/medication_model.dart';
 import '../../providers/auth_provider.dart';
@@ -64,8 +66,7 @@ class _MedsScreenState extends State<MedsScreen> {
           _filter == 'All' ||
           (_filter == 'Daily' && m.frequency.toLowerCase() == 'daily') ||
           (_filter == 'Weekly' && m.frequency.toLowerCase() == 'weekly') ||
-          (_filter == 'As Needed' &&
-              m.frequency.toLowerCase() == 'as needed');
+          (_filter == 'As Needed' && m.frequency.toLowerCase() == 'as needed');
       return matchSearch && matchFilter;
     }).toList();
   }
@@ -99,8 +100,7 @@ class _MedsScreenState extends State<MedsScreen> {
 
     final err = context.read<MedicationProvider>().errorMessage;
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(err)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       return;
     }
 
@@ -141,7 +141,10 @@ class _MedsScreenState extends State<MedsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => showAppMenu(context),
+        ),
         title: const Text('MedRemind'),
         actions: [
           IconButton(
@@ -161,10 +164,7 @@ class _MedsScreenState extends State<MedsScreen> {
                 children: [
                   const Text(
                     'My Medications',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 2),
                   const Text(
@@ -195,10 +195,9 @@ class _MedsScreenState extends State<MedsScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor:
-                          Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFF1A1A1A)
-                              : const Color(0xFFF1F5F9),
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF1A1A1A)
+                          : const Color(0xFFF1F5F9),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -230,9 +229,9 @@ class _MedsScreenState extends State<MedsScreen> {
                                 border: Border.all(
                                   color: selected
                                       ? AppColors.primary
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .outlineVariant,
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.outlineVariant,
                                 ),
                               ),
                               child: Text(
@@ -240,9 +239,7 @@ class _MedsScreenState extends State<MedsScreen> {
                                 style: TextStyle(
                                   color: selected
                                       ? Colors.white
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
+                                      : Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
                                 ),
@@ -265,12 +262,12 @@ class _MedsScreenState extends State<MedsScreen> {
                       itemBuilder: (context, index) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Shimmer.fromColors(
-                          baseColor: Theme.of(context).brightness ==
-                                  Brightness.dark
+                          baseColor:
+                              Theme.of(context).brightness == Brightness.dark
                               ? const Color(0xFF232323)
                               : const Color(0xFFE5E7EB),
-                          highlightColor: Theme.of(context).brightness ==
-                                  Brightness.dark
+                          highlightColor:
+                              Theme.of(context).brightness == Brightness.dark
                               ? const Color(0xFF2D2D2D)
                               : const Color(0xFFF3F4F6),
                           child: Container(
@@ -284,44 +281,44 @@ class _MedsScreenState extends State<MedsScreen> {
                       ),
                     )
                   : meds.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.medication_outlined,
-                                size: 64,
-                                color: AppColors.inactiveUpcoming
-                                    .withValues(alpha: 0.4),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'No medications found',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: () => context.go('/meds/add'),
-                                child: const Text('Add your first medication'),
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.medication_outlined,
+                            size: 64,
+                            color: AppColors.inactiveUpcoming.withValues(
+                              alpha: 0.4,
+                            ),
                           ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: meds.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) => _MedTile(
-                            med: meds[i],
-                            onDelete: () => _deleteMed(meds[i]),
-                            // FIX: pass toggle callback so active/inactive works
-                            onToggleStatus: () => _toggleStatus(meds[i]),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No medications found',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => context.go('/meds/add'),
+                            child: const Text('Add your first medication'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: meds.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) => _MedTile(
+                        med: meds[i],
+                        onDelete: () => _deleteMed(meds[i]),
+                        // FIX: pass toggle callback so active/inactive works
+                        onToggleStatus: () => _toggleStatus(meds[i]),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -348,8 +345,7 @@ class _MedTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final paused = med.status == 'paused';
-    final statusColor =
-        paused ? AppColors.inactiveUpcoming : AppColors.primary;
+    final statusColor = paused ? AppColors.inactiveUpcoming : AppColors.primary;
 
     return Semantics(
       button: true,
@@ -489,13 +485,16 @@ class _MedTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const PopupMenuItem(value: 'edit', child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  )),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'delete',
                     child: Row(

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../core/utils/menu_helpers.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../models/rbc_entry_model.dart';
@@ -45,10 +47,7 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
     final err = context.read<RbcProvider>().errorMessage;
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $err'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $err'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -75,7 +74,7 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () {},
+          onPressed: () => showAppMenu(context),
           icon: const Icon(Icons.menu),
           tooltip: 'Menu',
         ),
@@ -111,8 +110,9 @@ class _RbcDashboardScreenState extends State<RbcDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               'Monitor your red blood cell health over time.',
-              style: AppTextStyles.body(context)
-                  .copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.body(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
 
@@ -441,14 +441,12 @@ class _ChartCard extends StatelessWidget {
       return FlSpot(e.key.toDouble(), e.value.rbcCount);
     }).toList();
 
-    final minY = (chartEntries
-                .map((e) => e.rbcCount)
-                .reduce((a, b) => a < b ? a : b) -
-            0.5)
-        .clamp(0.0, double.infinity);
-    final maxY = chartEntries
-            .map((e) => e.rbcCount)
-            .reduce((a, b) => a > b ? a : b) +
+    final minY =
+        (chartEntries.map((e) => e.rbcCount).reduce((a, b) => a < b ? a : b) -
+                0.5)
+            .clamp(0.0, double.infinity);
+    final maxY =
+        chartEntries.map((e) => e.rbcCount).reduce((a, b) => a > b ? a : b) +
         0.5;
 
     return Container(
@@ -457,11 +455,7 @@ class _ChartCard extends StatelessWidget {
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            blurRadius: 8,
-            offset: Offset(0, 2),
-            color: Colors.black12,
-          ),
+          BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12),
         ],
       ),
       child: Column(
@@ -469,10 +463,7 @@ class _ChartCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                'RBC Count Trend',
-                style: AppTextStyles.subheading(context),
-              ),
+              Text('RBC Count Trend', style: AppTextStyles.subheading(context)),
               const SizedBox(width: 8),
               Container(
                 width: 10,
@@ -544,11 +535,11 @@ class _ChartCard extends StatelessWidget {
                       show: true,
                       getDotPainter: (spot, percent, bar, index) =>
                           FlDotCirclePainter(
-                        radius: 3.5,
-                        color: AppColors.primary,
-                        strokeWidth: 1.5,
-                        strokeColor: Colors.white,
-                      ),
+                            radius: 3.5,
+                            color: AppColors.primary,
+                            strokeWidth: 1.5,
+                            strokeColor: Colors.white,
+                          ),
                     ),
                     belowBarData: BarAreaData(
                       show: true,
@@ -573,8 +564,18 @@ class _ChartCard extends StatelessWidget {
 
   String _abbrevDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}';
   }
@@ -647,9 +648,9 @@ class _HistoryItem extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       entry.note!,
-                      style: AppTextStyles.caption(context).copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: AppTextStyles.caption(
+                        context,
+                      ).copyWith(fontStyle: FontStyle.italic),
                     ),
                   ],
                 ],
@@ -672,8 +673,18 @@ class _HistoryItem extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
@@ -753,8 +764,9 @@ class _EmptyState extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Tap + to add your first entry.',
-                style: AppTextStyles.body(context)
-                    .copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.body(
+                  context,
+                ).copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),

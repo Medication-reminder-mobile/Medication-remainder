@@ -94,23 +94,28 @@ class MedicationProvider extends ChangeNotifier {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
+    final old = _findMedicationById(id);
+    if (old != null) {
+      // FIX: save for undo before removing
+      _lastDeleted = old;
+      await NotificationService.instance.cancelMedicationReminders(
+        id,
+        old.scheduledTimes.length,
+      );
+    }
+
+    medications = medications.where((m) => m.id != id).toList(growable: false);
+    notifyListeners();
+
     try {
-      final old = _findMedicationById(id);
-      if (old != null) {
-        // FIX: save for undo before removing
-        _lastDeleted = old;
-        await NotificationService.instance.cancelMedicationReminders(
-          id,
-          old.scheduledTimes.length,
-        );
-      }
       await _db.deleteMedication(id);
-      medications = medications
-          .where((m) => m.id != id)
-          .toList(growable: false);
     } catch (e) {
       errorMessage = e.toString();
+      if (old != null) {
+        medications = [old, ...medications];
+      }
       _lastDeleted = null;
+      notifyListeners();
     } finally {
       isLoading = false;
       notifyListeners();

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/utils/menu_helpers.dart';
+
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_routes.dart';
 import '../providers/auth_provider.dart';
@@ -62,14 +64,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () {},
+          onPressed: () => showAppMenu(context),
           tooltip: 'Menu',
         ),
         title: const Text('MedRemind'),
         actions: [
           IconButton(
             icon: const Icon(Icons.mic_none_outlined),
-            onPressed: () {},
+            onPressed: () => context.go('/voice'),
             tooltip: 'Voice',
           ),
         ],

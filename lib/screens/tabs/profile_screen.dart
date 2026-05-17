@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/menu_helpers.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/voice_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -12,8 +15,9 @@ class ProfileScreen extends StatelessWidget {
   // ── Personal Information Dialog ─────────────────────────────────
   void _showPersonalInfo(BuildContext context, AuthProvider auth) {
     final nameCtrl = TextEditingController(text: auth.currentUser?.name ?? '');
-    final emailCtrl =
-        TextEditingController(text: auth.currentUser?.email ?? '');
+    final emailCtrl = TextEditingController(
+      text: auth.currentUser?.email ?? '',
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -42,8 +46,9 @@ class ProfileScreen extends StatelessWidget {
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                validator: (v) =>
-                    (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                validator: (v) => (v == null || !v.contains('@'))
+                    ? 'Enter a valid email'
+                    : null,
               ),
             ],
           ),
@@ -58,9 +63,9 @@ class ProfileScreen extends StatelessWidget {
               if (!(formKey.currentState?.validate() ?? false)) return;
               Navigator.pop(ctx);
               await context.read<AuthProvider>().updateUser(
-                    nameCtrl.text.trim(),
-                    emailCtrl.text.trim(),
-                  );
+                nameCtrl.text.trim(),
+                emailCtrl.text.trim(),
+              );
               if (!context.mounted) return;
               final err = context.read<AuthProvider>().errorMessage;
               ScaffoldMessenger.of(context).showSnackBar(
@@ -88,7 +93,8 @@ class ProfileScreen extends StatelessWidget {
       'Portuguese',
       'Swahili',
     ];
-    String selected = 'English';
+    final locale = context.read<LocaleProvider>();
+    String selected = locale.currentLanguage;
 
     showDialog(
       context: context,
@@ -100,13 +106,17 @@ class ProfileScreen extends StatelessWidget {
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: languages.length,
-              itemBuilder: (_, i) => RadioListTile<String>(
-                title: Text(languages[i]),
-                value: languages[i],
-                groupValue: selected,
-                activeColor: AppColors.primary,
-                onChanged: (v) => setState(() => selected = v ?? 'English'),
-              ),
+              itemBuilder: (_, i) =>
+                  // ignore: deprecated_member_use
+                  RadioListTile<String>(
+                    title: Text(languages[i]),
+                    value: languages[i],
+                    // ignore: deprecated_member_use
+                    groupValue: selected,
+                    activeColor: AppColors.primary,
+                    // ignore: deprecated_member_use
+                    onChanged: (v) => setState(() => selected = v ?? 'English'),
+                  ),
             ),
           ),
           actions: [
@@ -117,6 +127,10 @@ class ProfileScreen extends StatelessWidget {
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
+                context.read<LocaleProvider>().setLanguage(selected);
+                VoiceService.instance.initialize(
+                  languageCode: context.read<LocaleProvider>().voiceLocale,
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Language set to $selected'),
@@ -150,21 +164,21 @@ class ProfileScreen extends StatelessWidget {
                 title: const Text('Push Notifications'),
                 subtitle: const Text('Medication reminders'),
                 value: pushEnabled,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => pushEnabled = v),
               ),
               SwitchListTile(
                 title: const Text('Voice Reminders'),
                 subtitle: const Text('Speak medication name'),
                 value: voiceEnabled,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => voiceEnabled = v),
               ),
               SwitchListTile(
                 title: const Text('Missed Dose Alerts'),
                 subtitle: const Text('Alert when dose is missed'),
                 value: missedAlerts,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => missedAlerts = v),
               ),
             ],
@@ -222,7 +236,9 @@ class ProfileScreen extends StatelessWidget {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Local backup is always on — your data is safe'),
+                  content: Text(
+                    'Local backup is always on — your data is safe',
+                  ),
                   backgroundColor: Colors.green,
                 ),
               );
@@ -257,18 +273,13 @@ class ProfileScreen extends StatelessWidget {
               final err = context.read<AuthProvider>().errorMessage;
               if (err != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(err),
-                    backgroundColor: Colors.red,
-                  ),
+                  SnackBar(content: Text(err), backgroundColor: Colors.red),
                 );
                 return;
               }
               context.go('/auth');
             },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.missedAlert,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.missedAlert),
             child: const Text('Delete Forever'),
           ),
         ],
@@ -293,7 +304,7 @@ class ProfileScreen extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () {},
+          onPressed: () => showAppMenu(context),
           tooltip: 'Menu',
         ),
         title: const Text('MedRemind'),
@@ -331,8 +342,9 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 44,
-                        backgroundColor:
-                            AppColors.primary.withValues(alpha: 0.15),
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.15,
+                        ),
                         child: const Icon(
                           Icons.person_outline,
                           size: 48,
@@ -421,9 +433,9 @@ class ProfileScreen extends StatelessWidget {
               _SettingsTile(
                 icon: Icons.language_outlined,
                 title: 'Language',
-                trailing: const Text(
-                  'English',
-                  style: TextStyle(
+                trailing: Text(
+                  context.watch<LocaleProvider>().currentLanguage,
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
                   ),
@@ -498,7 +510,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     Switch(
                       value: isDark,
-                      activeColor: AppColors.primary,
+                      activeThumbColor: AppColors.primary,
                       onChanged: (_) =>
                           context.read<ThemeProvider>().toggleTheme(),
                     ),
@@ -602,11 +614,7 @@ class _SettingsGroup extends StatelessWidget {
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            blurRadius: 8,
-            offset: Offset(0, 2),
-            color: Colors.black12,
-          ),
+          BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Colors.black12),
         ],
       ),
       child: Column(children: children),
@@ -621,10 +629,9 @@ class _SettingsDivider extends StatelessWidget {
       height: 1,
       indent: 66,
       endIndent: 0,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(alpha: 0.5),
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: 0.5),
     );
   }
 }
@@ -673,8 +680,7 @@ class _SettingsTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style:
-                    TextStyle(fontWeight: FontWeight.w600, color: tColor),
+                style: TextStyle(fontWeight: FontWeight.w600, color: tColor),
               ),
             ),
             if (trailing != null) ...[trailing!, const SizedBox(width: 6)],
